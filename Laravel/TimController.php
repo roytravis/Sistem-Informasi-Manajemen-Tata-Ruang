@@ -71,7 +71,8 @@ class TimController extends Controller
     {
         $validatedData = $request->validate([
             'user_id' => 'required|exists:users,id',
-            'jabatan_di_tim' => ['required', Rule::in(['Ketua Tim', 'Petugas Lapangan'])],
+            // PERUBAHAN: Menambahkan 'Koordinator Lapangan' sebagai jabatan yang valid di dalam tim
+            'jabatan_di_tim' => ['required', Rule::in(['Ketua Tim', 'Petugas Lapangan', 'Koordinator Lapangan'])],
         ]);
 
         // Cek apakah user sudah ada di tim
@@ -98,3 +99,4 @@ class TimController extends Controller
         return response()->json($tim->load('users'));
     }
 }
+
