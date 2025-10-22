@@ -142,6 +142,18 @@ export default function PenilaianDetailPage() {
     const isDeskStudyTidakSesuai = useMemo(() => {
         return formData.desk_study.some(item => item.hasil_kesesuaian === 'Tidak Sesuai');
     }, [formData.desk_study]);
+
+    // --- PERUBAHAN: Filter anggota tim untuk mendapatkan Petugas Lapangan ---
+    const petugasLapangan = useMemo(() => {
+        if (!kasus || !kasus.tim || !kasus.tim.users) {
+            return [];
+        }
+        // Filter anggota tim yang jabatannya 'Petugas Lapangan'
+        return kasus.tim.users.filter(
+            member => member.pivot?.jabatan_di_tim === 'Petugas Lapangan'
+        );
+    }, [kasus]); // Bergantung pada data kasus
+    // --- PERUBAHAN SELESAI ---
     
     // **LOGIKA BARU: Gabungkan kondisi read-only**
     const isPemeriksaanDisabled = isReadOnly || isDeskStudyTidakSesuai;
@@ -179,13 +191,32 @@ export default function PenilaianDetailPage() {
             const kasusData = response.data;
             setKasus(kasusData);
 
+            // --- PERUBAHAN DIMULAI DI SINI ---
+            // Ambil data pemegang untuk auto-populate
+            const { pemegang } = kasusData;
+            const fullAlamat = [pemegang?.alamat, pemegang?.desa_kelurahan, pemegang?.kecamatan].filter(Boolean).join(', ');
+            const kegiatan = pemegang?.kegiatan || '';
+            // --- PERUBAHAN SELESAI ---
+
             if (kasusData.penilaian) {
                 setIsReadOnly(true);
                 setInitialPenilaianExists(true); 
 
-                const mergedDeskStudy = (kasusData.penilaian.desk_study && kasusData.penilaian.desk_study.length > 0)
-                    ? kasusData.penilaian.desk_study.map(item => ({ hasil_kesesuaian: 'Sesuai', ...item }))
-                    : [{ hasil_kesesuaian: 'Sesuai' }];
+                // Logika untuk memuat data desk study yang sudah ada
+                let deskStudyData;
+                if (kasusData.penilaian.desk_study && kasusData.penilaian.desk_study.length > 0) {
+                     // Gunakan data yang tersimpan
+                    deskStudyData = kasusData.penilaian.desk_study.map(item => ({ hasil_kesesuaian: 'Sesuai', ...item }));
+                } else {
+                    // Jika penilaian ada tapi desk_study kosong, tetap auto-populate
+                    deskStudyData = [{
+                        pernyataan_mandiri_lokasi: fullAlamat,
+                        pernyataan_mandiri_jenis: kegiatan,
+                        hasil_kesesuaian: 'Sesuai'
+                    }];
+                }
+                
+                const mergedDeskStudy = deskStudyData;
                 
                 const mergedPemeriksaan = Array.from({ length: 8 }, (_, i) => ({
                     hasil_pemeriksaan: 'Sesuai',
@@ -211,6 +242,20 @@ export default function PenilaianDetailPage() {
                     }, {});
                     setSignatures(sigs);
                 }
+            } else {
+                // --- PERUBAHAN DIMULAI DI SINI ---
+                // Ini adalah penilaian baru, auto-populate dari data pemegang
+                setFormData({
+                    desk_study: [{ 
+                        pernyataan_mandiri_lokasi: fullAlamat,
+                        pernyataan_mandiri_jenis: kegiatan,
+                        hasil_kesesuaian: 'Sesuai' 
+                    }],
+                    pemeriksaan: Array.from({ length: 8 }, () => ({ hasil_pemeriksaan: 'Sesuai' })),
+                    pengukuran: Array.from({ length: 12 }, () => ({})),
+                    catatan: '',
+                });
+                 // --- PERUBAHAN SELESAI ---
             }
         } catch (err) {
             setError('Gagal memuat detail data PMP UMK.');
@@ -266,11 +311,12 @@ export default function PenilaianDetailPage() {
             return;
         }
 
-        // PEROMBAKAN: Logika untuk mengumpulkan tanda tangan dari semua anggota tim
+        // --- PERUBAHAN: Logika untuk mengumpulkan tanda tangan disesuaikan ---
         const signatureData = [];
         let allMembersSigned = true;
 
-        kasus.tim?.users?.forEach(member => {
+        // Iterasi hanya pada petugas lapangan yang sudah difilter
+        petugasLapangan.forEach(member => {
             const sigCanvas = signatureRefs.current[member.id];
             const hasExistingSignature = !!signatures[member.id];
             const isCanvasEmpty = !sigCanvas || sigCanvas.isEmpty();
@@ -282,15 +328,21 @@ export default function PenilaianDetailPage() {
                     signature: sigCanvas.toDataURL(),
                 });
             } else if (!hasExistingSignature) {
-                // Jika tidak ada tanda tangan lama dan canvas kosong
+                // Jika tidak ada tanda tangan lama DAN canvas kosong, tandai sebagai belum ttd
                 allMembersSigned = false;
             }
+            // Jika sudah ada tanda tangan (hasExistingSignature), kita tidak perlu mengirim ulang,
+            // dan 'allMembersSigned' tetap true (karena sudah ttd sebelumnya).
         });
 
-        if (!allMembersSigned && !initialPenilaianExists) {
-            setError('Semua anggota tim harus memberikan tanda tangan pada penilaian pertama.');
+        // Cek tanda tangan hanya jika ada petugas lapangan
+        if (petugasLapangan.length > 0 && !allMembersSigned && !initialPenilaianExists) {
+            setError('Semua Petugas Lapangan harus memberikan tanda tangan pada penilaian pertama.');
+            setSubmitLoading(false); // Pastikan loading dihentikan
             return;
         }
+        // --- PERUBAHAN SELESAI ---
+
 
         const submissionData = { ...formData };
         submissionData.tanda_tangan_tim = signatureData;
@@ -477,61 +529,66 @@ export default function PenilaianDetailPage() {
                      <textarea id="catatan" name="catatan" value={formData.catatan} onChange={(e) => setFormData(p => ({...p, catatan: e.target.value}))} rows="4" className={`mt-1 block w-full rounded-md shadow-sm ${isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`} disabled={isReadOnly}></textarea>
                 </div>
                 
-                {/* PEROMBAKAN: Bagian Petugas Penilai dan Tanda Tangan */}
+                {/* --- PERUBAHAN: Bagian Petugas Penilai dan Tanda Tangan --- */}
                 <div className="pt-6 border-t mt-6">
-                    <h3 className="text-lg font-semibold px-2 mb-4">5. Petugas Penilai</h3>
+                    <h3 className="text-lg font-semibold px-2 mb-4">5. Petugas Penilai (Petugas Lapangan)</h3>
                     <div className="space-y-6">
-                        {kasus.tim?.users?.map(member => (
-                            <div key={member.id} className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 p-4 border rounded-md">
-                                {/* Kolom Info Petugas */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 font-semibold">Nama Petugas</label>
-                                    <p className="mt-1 p-2 border rounded-md bg-gray-50">{member.nama}</p>
-                                    
-                                    {/* PERUBAHAN: Menambahkan field NIP/NIK */}
-                                    <label className="block text-sm font-medium text-gray-700 font-semibold mt-2">NIP/NIK</label>
-                                    <p className="mt-1 p-2 border rounded-md bg-gray-50">{member.nip || 'Tidak tersedia'}</p>
+                        {/* Iterasi hanya pada petugas lapangan */}
+                        {petugasLapangan.length > 0 ? (
+                            petugasLapangan.map(member => (
+                                <div key={member.id} className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 p-4 border rounded-md">
+                                    {/* Kolom Info Petugas */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 font-semibold">Nama Petugas</label>
+                                        <p className="mt-1 p-2 border rounded-md bg-gray-50">{member.nama}</p>
+                                        
+                                        <label className="block text-sm font-medium text-gray-700 font-semibold mt-2">NIP/NIK</label>
+                                        <p className="mt-1 p-2 border rounded-md bg-gray-50">{member.nip || 'Tidak tersedia'}</p>
 
-                                    <label className="block text-sm font-medium text-gray-700 font-semibold mt-2">Jabatan</label>
-                                    <p className="mt-1 p-2 border rounded-md bg-gray-50">{member.pivot?.jabatan_di_tim || member.role}</p>
-                                </div>
-                                
-                                {/* Kolom Tanda Tangan */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 font-semibold">
-                                        {signatures[member.id] ? 'Tanda Tangan Tersimpan:' : 'Tanda Tangan Digital:'}
-                                    </label>
+                                        <label className="block text-sm font-medium text-gray-700 font-semibold mt-2">Jabatan</label>
+                                        <p className="mt-1 p-2 border rounded-md bg-gray-50">{member.pivot?.jabatan_di_tim || member.role}</p>
+                                    </div>
                                     
-                                    {signatures[member.id] ? (
-                                        <div className="my-1">
-                                            <img src={`http://127.0.0.1:8000/storage/${signatures[member.id]}`} alt={`Tanda Tangan ${member.nama}`} className="mx-auto h-24 border rounded bg-white"/>
-                                        </div>
-                                    ) : (
-                                        !isReadOnly && <p className="text-xs text-gray-500 my-1">Belum ada tanda tangan.</p>
-                                    )}
-                                    
-                                    {!isReadOnly && (
-                                        <>
-                                            <div className="border border-gray-300 rounded-md bg-white">
-                                                <SignatureCanvas 
-                                                    ref={el => signatureRefs.current[member.id] = el}
-                                                    penColor='black' 
-                                                    canvasProps={{className: 'w-full h-32'}} 
-                                                />
+                                    {/* Kolom Tanda Tangan */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 font-semibold">
+                                            {signatures[member.id] ? 'Tanda Tangan Tersimpan:' : 'Tanda Tangan Digital:'}
+                                        </label>
+                                        
+                                        {signatures[member.id] ? (
+                                            <div className="my-1">
+                                                <img src={`http://127.0.0.1:8000/storage/${signatures[member.id]}`} alt={`Tanda Tangan ${member.nama}`} className="mx-auto h-24 border rounded bg-white"/>
                                             </div>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => signatureRefs.current[member.id]?.clear()} 
-                                                className="text-sm text-blue-600 hover:underline mt-1">
-                                                Ulangi Tanda Tangan
-                                            </button>
-                                        </>
-                                    )}
+                                        ) : (
+                                            !isReadOnly && <p className="text-xs text-gray-500 my-1">Belum ada tanda tangan.</p>
+                                        )}
+                                        
+                                        {!isReadOnly && (
+                                            <>
+                                                <div className="border border-gray-300 rounded-md bg-white">
+                                                    <SignatureCanvas 
+                                                        ref={el => signatureRefs.current[member.id] = el}
+                                                        penColor='black' 
+                                                        canvasProps={{className: 'w-full h-32'}} 
+                                                    />
+                                                </div>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => signatureRefs.current[member.id]?.clear()} 
+                                                    className="text-sm text-blue-600 hover:underline mt-1">
+                                                    Ulangi Tanda Tangan
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        ) : (
+                            <p className="text-gray-500 text-sm">Tidak ada 'Petugas Lapangan' yang ditugaskan ke tim ini.</p>
+                        )}
                     </div>
                 </div>
+                {/* --- PERUBAHAN SELESAI --- */}
                 
                 {!isReadOnly && (
                     <div className="flex justify-end pt-4 print:hidden">
