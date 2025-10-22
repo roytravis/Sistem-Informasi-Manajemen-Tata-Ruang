@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import api from '../api/axios';
-import SignatureCanvas from 'react-signature-canvas'; // Ditambahkan
+import SignatureCanvas from 'react-signature-canvas';
 
 export default function AddBeritaAcaraPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { pemegang_id, tim_id, koordinator_id } = location.state || {};
     
-    // --- PERUBAHAN: State untuk menyimpan data anggota tim (bukan hanya ID) ---
+    // State untuk memisahkan koordinator dan petugas di UI
+    const [koordinator, setKoordinator] = useState(null);
+    const [petugasLapangan, setPetugasLapangan] = useState([]);
+    // State ini menyimpan semua anggota tim untuk logika submit
     const [timPenilai, setTimPenilai] = useState([]);
-    const signatureRefs = useRef({}); // Untuk menyimpan referensi ke setiap canvas
+    
+    const signatureRefs = useRef({});
 
     const [formData, setFormData] = useState({
         nomor_ba: '',
@@ -28,24 +32,40 @@ export default function AddBeritaAcaraPage() {
             return;
         }
 
-        const fetchTimMembers = async () => {
+        const fetchTimData = async () => {
             try {
                 const response = await api.get(`/tims/${tim_id}`);
-                const members = response.data.users;
-                if (members.length === 0) {
+                const allMembers = response.data.users;
+                
+                if (allMembers.length === 0) {
                      setError('Tim yang dipilih tidak memiliki anggota. Silakan periksa manajemen tim.');
                 }
-                setTimPenilai(members);
+                
+                // Simpan semua anggota untuk proses submit
+                setTimPenilai(allMembers);
+
+                // Pisahkan koordinator dan petugas untuk ditampilkan di UI
+                if (koordinator_id) {
+                    const coord = allMembers.find(m => m.id === parseInt(koordinator_id, 10));
+                    setKoordinator(coord);
+                    const petugas = allMembers.filter(m => m.id !== parseInt(koordinator_id, 10));
+                    setPetugasLapangan(petugas);
+                } else {
+                    // Jika tidak ada koordinator yang ditugaskan, tampilkan semua sebagai petugas
+                    setPetugasLapangan(allMembers);
+                    setKoordinator(null);
+                }
+
                 // Inisialisasi refs untuk setiap anggota
-                members.forEach(member => {
+                allMembers.forEach(member => {
                     signatureRefs.current[member.id] = null;
                 });
             } catch (err) {
                 setError('Gagal memuat data anggota tim.');
             }
         };
-        fetchTimMembers();
-    }, [tim_id, pemegang_id]);
+        fetchTimData();
+    }, [tim_id, pemegang_id, koordinator_id]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -63,12 +83,12 @@ export default function AddBeritaAcaraPage() {
             return;
         }
 
-        // --- PERUBAHAN: Mengumpulkan data tanda tangan ---
         const tandaTanganTim = [];
         let allSigned = true;
+        // Loop melalui semua anggota tim untuk mengumpulkan ttd
         for (const member of timPenilai) {
             const sigCanvas = signatureRefs.current[member.id];
-            if (sigCanvas.isEmpty()) {
+            if (!sigCanvas || sigCanvas.isEmpty()) {
                 allSigned = false;
                 break;
             }
@@ -79,7 +99,7 @@ export default function AddBeritaAcaraPage() {
         }
         
         if (!allSigned) {
-            setError("Semua anggota tim harus memberikan tanda tangan.");
+            setError("Semua anggota tim, termasuk Koordinator, harus memberikan tanda tangan.");
             setLoading(false);
             return;
         }
@@ -112,7 +132,6 @@ export default function AddBeritaAcaraPage() {
                 <h2 className="text-2xl font-bold text-gray-800 mb-6">Berita Acara Tidak Terlaksananya Penilaian</h2>
                 {error && <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4">{error}</div>}
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Input form tetap sama */}
                     <div>
                         <label htmlFor="nomor_ba" className="block text-sm font-medium text-gray-700">Nomor Berita Acara</label>
                         <input type="text" name="nomor_ba" id="nomor_ba" value={formData.nomor_ba} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
@@ -139,28 +158,49 @@ export default function AddBeritaAcaraPage() {
                         </div>
                     )}
 
-                    {/* --- PENAMBAHAN: Bagian Tanda Tangan Digital --- */}
+                    {/* Bagian Tanda Tangan Digital */}
                     <div className="pt-4 border-t">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Tanda Tangan Tim Penilai</h3>
                         <div className="space-y-4">
-                             {timPenilai.map(member => (
-                                <div key={member.id}>
-                                    <label className="block text-sm font-medium text-gray-700">{member.nama}</label>
+                            {/* Tanda Tangan Koordinator */}
+                            {koordinator && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Koordinator Lapangan: {koordinator.nama}</label>
                                     <div className="mt-1 border border-gray-300 rounded-md bg-gray-50">
                                         <SignatureCanvas
-                                            ref={el => signatureRefs.current[member.id] = el}
+                                            ref={el => signatureRefs.current[koordinator.id] = el}
                                             penColor='black'
                                             canvasProps={{ className: 'w-full h-32' }}
                                         />
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => signatureRefs.current[member.id]?.clear()}
+                                        onClick={() => signatureRefs.current[koordinator.id]?.clear()}
                                         className="text-sm text-blue-600 hover:underline mt-1">
                                         Ulangi Tanda Tangan
                                     </button>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* Tanda Tangan Petugas Lapangan */}
+                            {petugasLapangan.map((member, index) => (
+                               <div key={member.id}>
+                                   <label className="block text-sm font-medium text-gray-700">Petugas Lapangan {index + 1}: {member.nama}</label>
+                                   <div className="mt-1 border border-gray-300 rounded-md bg-gray-50">
+                                       <SignatureCanvas
+                                           ref={el => signatureRefs.current[member.id] = el}
+                                           penColor='black'
+                                           canvasProps={{ className: 'w-full h-32' }}
+                                       />
+                                   </div>
+                                   <button
+                                       type="button"
+                                       onClick={() => signatureRefs.current[member.id]?.clear()}
+                                       className="text-sm text-blue-600 hover:underline mt-1">
+                                       Ulangi Tanda Tangan
+                                   </button>
+                               </div>
+                           ))}
                         </div>
                     </div>
 
