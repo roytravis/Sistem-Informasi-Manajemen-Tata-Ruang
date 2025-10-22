@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
 
@@ -25,27 +25,67 @@ export default function BeritaAcaraPreviewPage() {
     
     const handlePrint = () => window.print();
 
+    // Menggunakan useMemo untuk efisiensi, agar kalkulasi tidak berjalan di setiap render
+    const { dateParts, alasanText, signatureMap, petugasLapangan } = useMemo(() => {
+        if (!ba) return {};
+
+        // 1. Format Tanggal
+        const date = new Date(ba.tanggal_ba);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' };
+        const formatter = new Intl.DateTimeFormat('id-ID', options);
+        const parts = formatter.formatToParts(date).reduce((acc, part) => ({...acc, [part.type]: part.value}), {});
+
+        // 2. Format Teks Alasan
+        let textForAlasan = '';
+        if (ba.alasan === 'Lainnya') {
+            textForAlasan = ba.keterangan_lainnya;
+        } else if (ba.alasan === 'Tidak dapat dihubungi') {
+            textForAlasan = 'dapat dihubungi';
+        } else if (ba.alasan === 'Lokasi tidak ditemukan') {
+            textForAlasan = 'ditemukan';
+        }
+        
+        // 3. Buat Peta Tanda Tangan untuk pencarian cepat
+        const sigMap = (ba.tanda_tangan_tim || []).reduce((acc, sig) => {
+            acc[sig.user_id] = sig.signature_path;
+            return acc;
+        }, {});
+
+        // 4. Pisahkan Petugas Lapangan dari Koordinator
+        // PERBAIKAN: Menggunakan properti snake_case 'tim_penilai' dari respons API Laravel
+        const petugas = ba.tim_penilai?.filter(user => user.id !== ba.koordinator?.id);
+
+        return {
+            dateParts: parts,
+            alasanText: textForAlasan,
+            signatureMap: sigMap,
+            petugasLapangan: petugas,
+        };
+    }, [ba]);
+
+
     if (loading) return <div className="text-center py-10">Memuat preview...</div>;
     if (error) return <div className="bg-red-100 text-red-700 p-4 rounded-lg">{error}</div>;
-    if (!ba) return <div className="text-center py-10">Data Berita Acara tidak ditemukan.</div>;
+    if (!ba || !dateParts) return <div className="text-center py-10">Data Berita Acara tidak ditemukan.</div>;
     
-    // Format Tanggal
-    const date = new Date(ba.tanggal_ba);
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' };
-    const formatter = new Intl.DateTimeFormat('id-ID', options);
-    const parts = formatter.formatToParts(date).reduce((acc, part) => ({...acc, [part.type]: part.value}), {});
-    
-    const alasanText = ba.alasan === 'Lainnya' ? ba.keterangan_lainnya : ba.alasan.toLowerCase();
-
     return (
         <div>
             <style>{`
                 @media print {
                     body * { visibility: hidden; }
                     .printable-area, .printable-area * { visibility: visible; }
-                    .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+                    .printable-area { 
+                        position: absolute; 
+                        left: 0; 
+                        top: 0; 
+                        width: 100%;
+                        font-family: 'Times New Roman', Times, serif;
+                        font-size: 12pt;
+                     }
                     .no-print { display: none; }
                 }
+                .ba-content { line-height: 2; }
+                .signature-block { page-break-inside: avoid; }
             `}</style>
 
             <div className="mb-6 flex justify-between items-center no-print">
@@ -55,50 +95,75 @@ export default function BeritaAcaraPreviewPage() {
                 </button>
             </div>
 
-            <div className="bg-white p-8 md:p-12 rounded-lg shadow-lg max-w-4xl mx-auto printable-area font-serif">
-                <div className="text-center border-b-2 border-black pb-4">
-                    <h2 className="text-xl font-bold tracking-wider">BERITA ACARA</h2>
-                    <h3 className="text-lg font-bold tracking-wider">TIDAK TERLAKSANANYA PENILAIAN PERNYATAAN MANDIRI</h3>
-                    <h3 className="text-lg font-bold tracking-wider">PELAKU USAHA MIKRO DAN KECIL</h3>
-                    <p className="mt-2 text-sm">Nomor: {ba.nomor_ba}</p>
+            <div className="bg-white p-8 md:p-12 rounded-lg shadow-lg max-w-4xl mx-auto printable-area font-serif text-black">
+                <div className="text-center uppercase font-bold">
+                    <h2 className="text-lg tracking-wider">BERITA ACARA</h2>
+                    <h3 className="text-lg tracking-wider">TIDAK TERLAKSANANYA PENILAIAN PERNYATAAN MANDIRI</h3>
+                    <h3 className="text-lg tracking-wider">PELAKU USAHA MIKRO DAN KECIL (UMK)</h3>
+                    <div className="border-b-2 border-black mt-2 mb-2 w-full"></div>
+                    <p className="text-base normal-case">Nomor: {ba.nomor_ba}</p>
                 </div>
 
-                <div className="mt-8 text-justify leading-relaxed">
-                    <p>
-                        Pada hari ini, {parts.weekday} tanggal {parts.day} bulan {parts.month} tahun {parts.year}, 
-                        yang bertanda tangan di bawah ini:
+                <div className="mt-8 text-justify ba-content">
+                    <p className="indent-8">
+                        Pada hari ini, {dateParts.weekday} tanggal {dateParts.day} bulan {dateParts.month} tahun {dateParts.year}, 
+                        kami yang bertanda tangan di bawah ini selaku Tim Penilai PMP UMK:
                     </p>
                     
-                    <div className="mt-4 pl-4 space-y-4">
-                        {ba?.timPenilai?.map((penilai, index) => (
-                            <div key={penilai.id}>
-                                <p>{index + 1}. <span className="inline-block w-24">Nama</span>: {penilai.nama}</p>
-                                <p><span className="inline-block w-28 pl-5">NIP/NIK</span>: {penilai.nip || '-'}</p>
-                                <p><span className="inline-block w-28 pl-5">Jabatan</span>: {penilai.role}</p>
-                            </div>
+                    <div className="mt-4 ml-8 space-y-2">
+                        {/* PERBAIKAN: Menggunakan properti snake_case 'tim_penilai' */}
+                        {ba?.tim_penilai?.map((penilai) => (
+                            <div key={penilai.id} className="grid grid-cols-[80px_10px_auto]">
+                                <span>Nama</span><span>:</span><span>{penilai.nama}</span>
+                                <span>NIP/NIK</span><span>:</span><span>{penilai.nip || '..............................'}</span>
+                                {/* PERBAIKAN: Menggunakan 'penilai.jabatan' atau fallback ke 'penilai.role' */}
+                                <span>Jabatan</span><span>:</span><span>{penilai.jabatan || penilai.role}</span>
+                           </div>
                         ))}
                     </div>
 
-                    <p className="mt-6">
-                        Menyatakan bahwa penilaian pernyataan mandiri Pelaku Usaha Mikro dan Kecil (UMK) 
-                        atas nama <strong>{ba.pemegang?.nama_pelaku_usaha}</strong> tidak dapat dilaksanakan karena{' '}
-                        <strong>{alasanText}</strong>.
+                    <p className="mt-4 indent-8">
+                        Dengan ini menyatakan bahwa penilaian pernyataan mandiri pelaku Usaha Mikro dan Kecil (UMK) 
+                        atas nama <strong>{ba.pemegang?.nama_pelaku_usaha}</strong> tidak dapat dilaksanakan, dikarenakan:
                     </p>
-
-                    <p className="mt-6">
-                        Demikian Berita Acara ini dibuat untuk dipergunakan sebagaimana mestinya.
+                    <p className="mt-4 indent-8">
+                        Pemegang pernyataan mandiri pelaku UMK tidak <strong>{alasanText}</strong>. 
+                        Hal tersebut mengakibatkan penilaian pernyataan mandiri pelaku UMK tidak terlaksana sebagaimana seharusnya.
+                    </p>
+                    <p className="mt-4 indent-8">
+                        Demikian Berita Acara ini dibuat dengan sebenarnya untuk dapat dipergunakan sebagaimana mestinya.
                     </p>
                 </div>
                 
                 <div className="mt-12">
-                    <h4 className="font-semibold text-center mb-2">Tim Penilai,</h4>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-16 mt-20 text-center">
-                        {ba?.timPenilai?.map(penilai => (
-                            <div key={penilai.id}>
-                                <p className="border-t border-black pt-2 font-semibold">{penilai.nama}</p>
-                                <p className="text-sm">NIP. {penilai.nip || '-'}</p>
+                    <h4 className="font-semibold text-center">Tanda Tangan Tim Penilai</h4>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-10 mt-6 text-center">
+                       
+                        {petugasLapangan?.map((petugas, index) => (
+                            <div key={petugas.id} className="signature-block mt-4">
+                                <p>Petugas Lapangan {index + 1}</p>
+                                <div className="h-24 w-full my-2 flex items-center justify-center">
+                                    {signatureMap[petugas.id] && (
+                                         <img src={`http://127.0.0.1:8000/storage/${signatureMap[petugas.id]}`} alt={`Tanda Tangan ${petugas.nama}`} className="h-full object-contain"/>
+                                    )}
+                                </div>
+                                <p className="font-bold underline">({petugas.nama})</p>
+                                <p>NIP/NIK: {petugas.nip || '..............................'}</p>
                             </div>
                         ))}
+                         
+                        {ba.koordinator && (
+                             <div className="signature-block mt-4">
+                                <p>Koordinator Lapangan</p>
+                                <div className="h-24 w-full my-2 flex items-center justify-center">
+                                     {signatureMap[ba.koordinator.id] && (
+                                         <img src={`http://127.0.0.1:8000/storage/${signatureMap[ba.koordinator.id]}`} alt={`Tanda Tangan ${ba.koordinator.nama}`} className="h-full object-contain"/>
+                                    )}
+                                </div>
+                                <p className="font-bold underline">({ba.koordinator.nama})</p>
+                                <p>NIP/NIK: {ba.koordinator.nip || '..............................'}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
