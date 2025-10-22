@@ -73,7 +73,8 @@ const ManageMembersModal = ({ tim, onClose, onSave }) => {
 
     useEffect(() => {
         api.get('/users').then(res => {
-            const filteredUsers = res.data.filter(u => ['Ketua Tim', 'Petugas Lapangan'].includes(u.role));
+            // PERUBAHAN: Menambahkan 'Koordinator Lapangan' ke filter pengguna yang bisa ditambahkan
+            const filteredUsers = res.data.filter(u => ['Ketua Tim', 'Petugas Lapangan', 'Koordinator Lapangan'].includes(u.role));
             setUsers(filteredUsers);
         });
     }, []);
@@ -131,6 +132,8 @@ const ManageMembersModal = ({ tim, onClose, onSave }) => {
                         <select value={jabatan} onChange={(e) => setJabatan(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                             <option value="Ketua Tim">Ketua Tim</option>
                             <option value="Petugas Lapangan">Petugas Lapangan</option>
+                            {/* PENAMBAHAN: Opsi untuk Koordinator Lapangan */}
+                            <option value="Koordinator Lapangan">Koordinator Lapangan</option>
                         </select>
                     </div>
                     <button type="submit" disabled={loading} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 h-10">Tambah</button>
@@ -260,3 +263,4 @@ export default function TimPenilaiPage() {
         </div>
     );
 }
+
