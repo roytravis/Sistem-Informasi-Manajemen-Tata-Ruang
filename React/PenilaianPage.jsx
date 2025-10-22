@@ -1,0 +1,178 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../api/axios.js';
+
+// Komponen Badge Status
+const StatusPenilaianBadge = ({ permohonan }) => {
+    const sudahDinilai = permohonan.kasus && permohonan.kasus.penilaian;
+    if (sudahDinilai) {
+        return <span className="py-1 px-3 rounded-full text-xs font-medium bg-green-200 text-green-800">Selesai Dinilai</span>;
+    }
+    return <span className="py-1 px-3 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">Menunggu Penilaian</span>;
+};
+
+export default function PenilaianPage() {
+    const [pmpList, setPmpList] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [isNavigating, setIsNavigating] = useState(null);
+    const navigate = useNavigate();
+
+    // State baru untuk filter dan pagination
+    const [filter, setFilter] = useState('pending'); // 'pending' or 'all'
+    const [pagination, setPagination] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const fetchPmpUmk = async (page = 1, statusFilter = 'pending') => {
+        setError('');
+        setLoading(true);
+        try {
+            // Kirim parameter filter dan halaman ke API
+            const response = await api.get(`/permohonan-penilaian?page=${page}&status=${statusFilter}`);
+            setPmpList(response.data.data);
+            // Simpan data pagination dari response API
+            setPagination({
+                current_page: response.data.current_page,
+                last_page: response.data.last_page,
+                total: response.data.total,
+                from: response.data.from,
+                to: response.data.to,
+            });
+        } catch (err) {
+            const serverError = err.response?.data?.message || 'Pastikan server backend berjalan.';
+            setError(`Gagal memuat data. ${serverError}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // useEffect akan berjalan saat halaman berubah atau filter diganti
+    useEffect(() => {
+        fetchPmpUmk(currentPage, filter);
+    }, [currentPage, filter]);
+    
+    // Handler untuk mengubah filter dan kembali ke halaman 1
+    const handleFilterChange = (newFilter) => {
+        setFilter(newFilter);
+        setCurrentPage(1); // Reset ke halaman pertama saat filter berubah
+    };
+
+    const handleNilai = async (permohonan) => {
+        setIsNavigating(permohonan.id);
+        setError('');
+        try {
+            if (permohonan.kasus?.id) {
+                navigate(`/penilaian/${permohonan.kasus.id}`);
+            } else {
+                const response = await api.post(`/penilaian/initiate/${permohonan.id}`);
+                const { kasus_id } = response.data;
+                navigate(`/penilaian/${kasus_id}`);
+            }
+        } catch (err) {
+            setError('Gagal memproses penilaian. Silakan coba lagi.');
+        } finally {
+            setIsNavigating(null);
+        }
+    };
+
+    const handleEdit = (permohonanId) => {
+        navigate(`/penilaian/${permohonanId}/edit`);
+    };
+
+    const handleDelete = async (permohonanId) => {
+        if (window.confirm('Apakah Anda yakin ingin menghapus data permohonan ini?')) {
+            try {
+                await api.delete(`/permohonan-penilaian/${permohonanId}`);
+                fetchPmpUmk(currentPage, filter); // Muat ulang data
+            } catch (err) {
+                setError('Gagal menghapus data. Silakan coba lagi.');
+            }
+        }
+    };
+
+    return (
+        <div className="px-4 py-6 sm:px-0">
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="sm:flex sm:justify-between sm:items-center mb-4">
+                    <div>
+                        <h2 className="text-3xl font-bold text-gray-900">Dashboard Penilaian PMP UMK</h2>
+                        <p className="mt-1 text-gray-600">Daftar permohonan penilaian untuk Pelaku UMK.</p>
+                    </div>
+                    <button 
+                        onClick={() => navigate('/penilaian/tambah')}
+                        className="mt-4 sm:mt-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
+                    >
+                        + Tambah Penilaian Baru
+                    </button>
+                </div>
+
+                {/* Tombol Filter */}
+                <div className="border-b border-gray-200 mb-4">
+                    <nav className="-mb-px flex space-x-6">
+                        <button onClick={() => handleFilterChange('pending')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'pending' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                            Menunggu Penilaian
+                        </button>
+                        <button onClick={() => handleFilterChange('all')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'all' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                            Semua Permohonan
+                        </button>
+                    </nav>
+                </div>
+                
+                {loading && <p className="text-center py-4">Memuat data...</p>}
+                {error && <p className="text-red-500 p-3 bg-red-100 rounded-md">{error}</p>}
+
+                {!loading && !error && (
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full bg-white">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="text-left py-3 px-4 uppercase font-semibold text-sm">Nama Pelaku Usaha</th>
+                                        <th className="text-left py-3 px-4 uppercase font-semibold text-sm">NIB</th>
+                                        <th className="text-left py-3 px-4 uppercase font-semibold text-sm">Status</th>
+                                        <th className="text-left py-3 px-4 uppercase font-semibold text-sm">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-gray-700 divide-y divide-gray-200">
+                                    {pmpList.length > 0 ? pmpList.map(p => {
+                                        const sudahDinilai = p.kasus && p.kasus.penilaian;
+                                        return (
+                                        <tr key={p.id} className="hover:bg-gray-50">
+                                            <td className="py-3 px-4">{p.pemegang?.nama_pelaku_usaha || '-'}</td>
+                                            <td className="py-3 px-4 font-mono">{p.pemegang?.nomor_identitas || '-'}</td>
+                                            <td className="py-3 px-4"><StatusPenilaianBadge permohonan={p} /></td>
+                                            <td className="py-3 px-4 flex items-center space-x-2">
+                                                <button onClick={() => handleNilai(p)} disabled={isNavigating === p.id} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm disabled:bg-blue-400">
+                                                    {isNavigating === p.id ? '...' : (sudahDinilai ? 'Detail' : 'Nilai')}
+                                                </button>
+                                                <button onClick={() => handleEdit(p.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Edit</button>
+                                                <button onClick={() => handleDelete(p.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Hapus</button>
+                                            </td>
+                                        </tr>
+                                        )
+                                    }) : (
+                                        <tr>
+                                            <td colSpan="4" className="text-center py-10 text-gray-500">Tidak ada data.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Kontrol Pagination */}
+                        {pagination && pagination.last_page > 1 && (
+                             <div className="mt-4 flex justify-between items-center">
+                                <span className="text-sm text-gray-700">
+                                    Menampilkan {pagination.from} sampai {pagination.to} dari {pagination.total} data
+                                </span>
+                                <div className="space-x-1">
+                                    <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} className="px-3 py-1 text-sm bg-white border rounded-md disabled:opacity-50">&laquo; Sebelumnya</button>
+                                    <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === pagination.last_page} className="px-3 py-1 text-sm bg-white border rounded-md disabled:opacity-50">Berikutnya &raquo;</button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </div>
+    );
+}

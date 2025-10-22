@@ -1,0 +1,4 @@
+/* Ganti @import yang salah dengan tiga arahan @tailwind yang benar */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
