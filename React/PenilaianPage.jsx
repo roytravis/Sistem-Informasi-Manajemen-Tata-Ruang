@@ -4,10 +4,17 @@ import api from '../api/axios.js';
 
 // Komponen Badge Status
 const StatusPenilaianBadge = ({ permohonan }) => {
+    // PERBAIKAN: Cek status 'Penilaian Tidak Terlaksana' terlebih dahulu
+    if (permohonan.status === 'Penilaian Tidak Terlaksana' && permohonan.berita_acara_id) {
+        return <span className="py-1 px-3 rounded-full text-xs font-medium bg-gray-200 text-gray-800">Penilaian Tidak Terlaksana</span>;
+    }
+    
     const sudahDinilai = permohonan.kasus && permohonan.kasus.penilaian;
     if (sudahDinilai) {
         return <span className="py-1 px-3 rounded-full text-xs font-medium bg-green-200 text-green-800">Selesai Dinilai</span>;
     }
+    
+    // Status default
     return <span className="py-1 px-3 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">Menunggu Penilaian</span>;
 };
 
@@ -18,8 +25,7 @@ export default function PenilaianPage() {
     const [isNavigating, setIsNavigating] = useState(null);
     const navigate = useNavigate();
 
-    // State baru untuk filter dan pagination
-    const [filter, setFilter] = useState('pending'); // 'pending' or 'all'
+    const [filter, setFilter] = useState('pending');
     const [pagination, setPagination] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -27,10 +33,8 @@ export default function PenilaianPage() {
         setError('');
         setLoading(true);
         try {
-            // Kirim parameter filter dan halaman ke API
             const response = await api.get(`/permohonan-penilaian?page=${page}&status=${statusFilter}`);
             setPmpList(response.data.data);
-            // Simpan data pagination dari response API
             setPagination({
                 current_page: response.data.current_page,
                 last_page: response.data.last_page,
@@ -46,15 +50,13 @@ export default function PenilaianPage() {
         }
     };
 
-    // useEffect akan berjalan saat halaman berubah atau filter diganti
     useEffect(() => {
         fetchPmpUmk(currentPage, filter);
     }, [currentPage, filter]);
     
-    // Handler untuk mengubah filter dan kembali ke halaman 1
     const handleFilterChange = (newFilter) => {
         setFilter(newFilter);
-        setCurrentPage(1); // Reset ke halaman pertama saat filter berubah
+        setCurrentPage(1);
     };
 
     const handleNilai = async (permohonan) => {
@@ -80,10 +82,10 @@ export default function PenilaianPage() {
     };
 
     const handleDelete = async (permohonanId) => {
-        if (window.confirm('Apakah Anda yakin ingin menghapus data permohonan ini?')) {
+        if (window.confirm('Apakah Anda yakin ingin menghapus data permohonan ini? Ini juga akan menghapus Berita Acara terkait (jika ada).')) {
             try {
                 await api.delete(`/permohonan-penilaian/${permohonanId}`);
-                fetchPmpUmk(currentPage, filter); // Muat ulang data
+                fetchPmpUmk(currentPage, filter);
             } catch (err) {
                 setError('Gagal menghapus data. Silakan coba lagi.');
             }
@@ -106,7 +108,6 @@ export default function PenilaianPage() {
                     </button>
                 </div>
 
-                {/* Tombol Filter */}
                 <div className="border-b border-gray-200 mb-4">
                     <nav className="-mb-px flex space-x-6">
                         <button onClick={() => handleFilterChange('pending')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'pending' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
@@ -135,18 +136,52 @@ export default function PenilaianPage() {
                                 </thead>
                                 <tbody className="text-gray-700 divide-y divide-gray-200">
                                     {pmpList.length > 0 ? pmpList.map(p => {
+                                        // PERBAIKAN: Logika dipindahkan ke variabel
                                         const sudahDinilai = p.kasus && p.kasus.penilaian;
+                                        const tidakTerlaksana = p.status === 'Penilaian Tidak Terlaksana' && p.berita_acara_id;
+
                                         return (
                                         <tr key={p.id} className="hover:bg-gray-50">
                                             <td className="py-3 px-4">{p.pemegang?.nama_pelaku_usaha || '-'}</td>
                                             <td className="py-3 px-4 font-mono">{p.pemegang?.nomor_identitas || '-'}</td>
                                             <td className="py-3 px-4"><StatusPenilaianBadge permohonan={p} /></td>
                                             <td className="py-3 px-4 flex items-center space-x-2">
-                                                <button onClick={() => handleNilai(p)} disabled={isNavigating === p.id} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm disabled:bg-blue-400">
-                                                    {isNavigating === p.id ? '...' : (sudahDinilai ? 'Detail' : 'Nilai')}
+                                                
+                                                {/* PERBAIKAN: Logika tombol Aksi */}
+                                                {tidakTerlaksana ? (
+                                                    <button 
+                                                        onClick={() => navigate(`/penilaian/berita-acara/${p.berita_acara_id}/preview`)} 
+                                                        className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                    >
+                                                        Detail BA
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => handleNilai(p)} 
+                                                        disabled={isNavigating === p.id} 
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-sm disabled:bg-blue-400"
+                                                    >
+                                                        {isNavigating === p.id ? '...' : (sudahDinilai ? 'Detail' : 'Nilai')}
+                                                    </button>
+                                                )}
+                                                
+                                                {/* Tombol Edit dan Hapus tidak ditampilkan jika 'tidak terlaksana' */}
+                                                {!tidakTerlaksana && (
+                                                    <button 
+                                                        onClick={() => handleEdit(p.id)} 
+                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                )}
+
+                                                <button 
+                                                    onClick={() => handleDelete(p.id)} 
+                                                    className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                >
+                                                    Hapus
                                                 </button>
-                                                <button onClick={() => handleEdit(p.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Edit</button>
-                                                <button onClick={() => handleDelete(p.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Hapus</button>
+
                                             </td>
                                         </tr>
                                         )
@@ -158,7 +193,6 @@ export default function PenilaianPage() {
                                 </tbody>
                             </table>
                         </div>
-                        {/* Kontrol Pagination */}
                         {pagination && pagination.last_page > 1 && (
                              <div className="mt-4 flex justify-between items-center">
                                 <span className="text-sm text-gray-700">

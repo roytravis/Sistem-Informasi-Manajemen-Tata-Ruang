@@ -12,6 +12,7 @@ export default function BeritaAcaraPreviewPage() {
         const fetchBA = async () => {
             setLoading(true);
             try {
+                // Controller sekarang mengirim 'tim_penilai' sebagai array user yang sudah diproses
                 const response = await api.get(`/berita-acara/${id}`);
                 setBa(response.data);
             } catch (err) {
@@ -25,7 +26,6 @@ export default function BeritaAcaraPreviewPage() {
     
     const handlePrint = () => window.print();
 
-    // Menggunakan useMemo untuk efisiensi, agar kalkulasi tidak berjalan di setiap render
     const { dateParts, alasanText, signatureMap, petugasLapangan } = useMemo(() => {
         if (!ba) return {};
 
@@ -45,14 +45,14 @@ export default function BeritaAcaraPreviewPage() {
             textForAlasan = 'ditemukan';
         }
         
-        // 3. Buat Peta Tanda Tangan untuk pencarian cepat
+        // 3. Buat Peta Tanda Tangan
         const sigMap = (ba.tanda_tangan_tim || []).reduce((acc, sig) => {
             acc[sig.user_id] = sig.signature_path;
             return acc;
         }, {});
 
         // 4. Pisahkan Petugas Lapangan dari Koordinator
-        // PERBAIKAN: Menggunakan properti snake_case 'tim_penilai' dari respons API Laravel
+        // PERBAIKAN: Menggunakan properti 'tim_penilai' yang sudah diproses oleh controller
         const petugas = ba.tim_penilai?.filter(user => user.id !== ba.koordinator?.id);
 
         return {
@@ -89,6 +89,7 @@ export default function BeritaAcaraPreviewPage() {
             `}</style>
 
             <div className="mb-6 flex justify-between items-center no-print">
+                {/* PERBAIKAN: Link kembali ke dashboard penilaian */}
                 <Link to="/penilaian" className="text-blue-600 hover:underline">&larr; Kembali ke Dashboard Penilaian</Link>
                 <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                     Cetak
@@ -111,12 +112,12 @@ export default function BeritaAcaraPreviewPage() {
                     </p>
                     
                     <div className="mt-4 ml-8 space-y-2">
-                        {/* PERBAIKAN: Menggunakan properti snake_case 'tim_penilai' */}
+                        {/* PERBAIKAN: Menggunakan properti 'tim_penilai' yang sudah diproses */}
                         {ba?.tim_penilai?.map((penilai) => (
                             <div key={penilai.id} className="grid grid-cols-[80px_10px_auto]">
                                 <span>Nama</span><span>:</span><span>{penilai.nama}</span>
                                 <span>NIP/NIK</span><span>:</span><span>{penilai.nip || '..............................'}</span>
-                                {/* PERBAIKAN: Menggunakan 'penilai.jabatan' atau fallback ke 'penilai.role' */}
+                                {/* PERBAIKAN: Gunakan 'jabatan' dari tabel user atau fallback ke 'role' */}
                                 <span>Jabatan</span><span>:</span><span>{penilai.jabatan || penilai.role}</span>
                            </div>
                         ))}
@@ -170,4 +171,3 @@ export default function BeritaAcaraPreviewPage() {
         </div>
     );
 }
-

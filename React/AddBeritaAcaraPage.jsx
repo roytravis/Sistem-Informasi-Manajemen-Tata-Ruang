@@ -6,12 +6,11 @@ import SignatureCanvas from 'react-signature-canvas';
 export default function AddBeritaAcaraPage() {
     const navigate = useNavigate();
     const location = useLocation();
+    // Ambil tim_id dari location state
     const { pemegang_id, tim_id, koordinator_id } = location.state || {};
     
-    // State untuk memisahkan koordinator dan petugas di UI
     const [koordinator, setKoordinator] = useState(null);
     const [petugasLapangan, setPetugasLapangan] = useState([]);
-    // State ini menyimpan semua anggota tim untuk logika submit
     const [timPenilai, setTimPenilai] = useState([]);
     
     const signatureRefs = useRef({});
@@ -41,22 +40,20 @@ export default function AddBeritaAcaraPage() {
                      setError('Tim yang dipilih tidak memiliki anggota. Silakan periksa manajemen tim.');
                 }
                 
-                // Simpan semua anggota untuk proses submit
                 setTimPenilai(allMembers);
 
-                // Pisahkan koordinator dan petugas untuk ditampilkan di UI
                 if (koordinator_id) {
                     const coord = allMembers.find(m => m.id === parseInt(koordinator_id, 10));
                     setKoordinator(coord);
+                    // Filter petugas: semua anggota tim SELAIN koordinator
                     const petugas = allMembers.filter(m => m.id !== parseInt(koordinator_id, 10));
                     setPetugasLapangan(petugas);
                 } else {
-                    // Jika tidak ada koordinator yang ditugaskan, tampilkan semua sebagai petugas
+                    // Jika tidak ada koordinator, semua anggota adalah petugas
                     setPetugasLapangan(allMembers);
                     setKoordinator(null);
                 }
 
-                // Inisialisasi refs untuk setiap anggota
                 allMembers.forEach(member => {
                     signatureRefs.current[member.id] = null;
                 });
@@ -85,7 +82,6 @@ export default function AddBeritaAcaraPage() {
 
         const tandaTanganTim = [];
         let allSigned = true;
-        // Loop melalui semua anggota tim untuk mengumpulkan ttd
         for (const member of timPenilai) {
             const sigCanvas = signatureRefs.current[member.id];
             if (!sigCanvas || sigCanvas.isEmpty()) {
@@ -104,15 +100,18 @@ export default function AddBeritaAcaraPage() {
             return;
         }
         
+        // PERBAIKAN: Tambahkan 'tim_id' ke payload
         const payload = {
             ...formData,
             pemegang_id: pemegang_id,
+            tim_id: tim_id, // Ini yang ditambahkan
             koordinator_id: koordinator_id,
             tanda_tangan_tim: tandaTanganTim,
         };
 
         try {
             const response = await api.post('/berita-acara', payload);
+            // Navigasi ke preview BA setelah sukses
             navigate(`/penilaian/berita-acara/${response.data.id}/preview`);
         } catch (err) {
             setError(err.response?.data?.message || 'Terjadi kesalahan saat menyimpan.');
@@ -158,11 +157,9 @@ export default function AddBeritaAcaraPage() {
                         </div>
                     )}
 
-                    {/* Bagian Tanda Tangan Digital */}
                     <div className="pt-4 border-t">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Tanda Tangan Tim Penilai</h3>
                         <div className="space-y-4">
-                            {/* Tanda Tangan Koordinator */}
                             {koordinator && (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Koordinator Lapangan: {koordinator.nama}</label>
@@ -182,7 +179,6 @@ export default function AddBeritaAcaraPage() {
                                 </div>
                             )}
 
-                            {/* Tanda Tangan Petugas Lapangan */}
                             {petugasLapangan.map((member, index) => (
                                <div key={member.id}>
                                    <label className="block text-sm font-medium text-gray-700">Petugas Lapangan {index + 1}: {member.nama}</label>
