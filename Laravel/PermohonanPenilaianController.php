@@ -12,14 +12,13 @@ class PermohonanPenilaianController extends Controller
 {
     public function index(Request $request)
     {
-        // PERBAIKAN: Tambahkan query builder untuk filtering
-        $query = PermohonanPenilaian::with(['pemegang', 'kasus.penilaian']);
+        // PERBAIKAN: Eager load relasi 'beritaAcara'
+        $query = PermohonanPenilaian::with(['pemegang', 'kasus.penilaian', 'beritaAcara']);
 
-        // Jika ada parameter 'status=pending', filter hanya yang belum dinilai
         if ($request->query('status') === 'pending') {
-            // Logika: Tampilkan permohonan yang relasi kasus->penilaian nya tidak ada.
-            // Ini secara efektif menyaring yang sudah punya hasil penilaian.
             $query->whereDoesntHave('kasus.penilaian');
+            // Pastikan juga tidak menampilkan yang statusnya 'Penilaian Tidak Terlaksana'
+            $query->where('status', '!=', 'Penilaian Tidak Terlaksana');
         }
 
         $penilaians = $query->latest()->paginate(15);
@@ -29,15 +28,16 @@ class PermohonanPenilaianController extends Controller
 
     public function store(Request $request)
     {
-        // PERBAIKAN: Validasi untuk 'prioritas_score' dihapus
         $validatedData = $request->validate([
             'pemegang_id' => 'required|exists:pemegangs,id',
             'tim_id' => 'nullable|exists:tims,id',
             'penanggung_jawab_id' => 'nullable|exists:users,id',
         ]);
 
-        // Buat nomor permohonan secara otomatis
         $validatedData['nomor_permohonan'] = now()->timestamp . '-' . Str::random(5);
+        
+        // Status default saat dibuat manual adalah 'Baru' (atau 'Menunggu Penilaian')
+        $validatedData['status'] = 'Menunggu Penilaian';
 
 
         $penilaian = PermohonanPenilaian::create($validatedData);
@@ -51,7 +51,6 @@ class PermohonanPenilaianController extends Controller
 
     public function update(Request $request, PermohonanPenilaian $permohonanPenilaian)
     {
-        // PERBAIKAN: Validasi untuk 'prioritas_score' dihapus
         $validatedData = $request->validate([
             'pemegang_id' => 'required|exists:pemegangs,id',
             'tim_id' => 'nullable|exists:tims,id',
@@ -64,6 +63,11 @@ class PermohonanPenilaianController extends Controller
 
     public function destroy(PermohonanPenilaian $permohonanPenilaian)
     {
+        // Hapus juga BA terkait jika ada, untuk menghindari data yatim
+        if ($permohonanPenilaian->beritaAcara) {
+            $permohonanPenilaian->beritaAcara->delete();
+        }
+        
         $permohonanPenilaian->delete();
         return response()->json(null, 204);
     }

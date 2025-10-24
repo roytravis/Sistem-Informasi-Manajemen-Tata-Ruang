@@ -11,14 +11,15 @@ class PermohonanPenilaian extends Model
 
     protected $table = 'permohonan_penilaians';
 
-    // PERBAIKAN: Hapus 'nomor_permohonan' dari fillable
+    // PERBAIKAN: Tambahkan 'berita_acara_id' ke fillable
     protected $fillable = [
         'status',
         'prioritas_score',
         'pemegang_id',
         'tim_id',
         'penanggung_jawab_id',
-        'nomor_permohonan', // Tetap ada untuk auto-generation
+        'nomor_permohonan',
+        'berita_acara_id', // Ditambahkan
     ];
 
     // Definisikan relasi yang sama seperti pada model Kasus
@@ -44,5 +45,13 @@ class PermohonanPenilaian extends Model
     public function kasus()
     {
         return $this->hasOne(Kasus::class, 'nomor_permohonan', 'nomor_permohonan');
+    }
+
+    /**
+     * PENAMBAHAN: Relasi ke Berita Acara
+     */
+    public function beritaAcara()
+    {
+        return $this->belongsTo(BeritaAcara::class, 'berita_acara_id');
     }
 }

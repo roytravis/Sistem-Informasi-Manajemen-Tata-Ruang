@@ -51,4 +51,12 @@ class BeritaAcara extends Model
     {
         return $this->belongsToMany(User::class, 'berita_acara_user', 'berita_acara_id', 'user_id');
     }
+
+    /**
+     * PENAMBAHAN: Relasi ke Permohonan Penilaian
+     */
+    public function permohonanPenilaian()
+    {
+        return $this->hasOne(PermohonanPenilaian::class, 'berita_acara_id');
+    }
 }
