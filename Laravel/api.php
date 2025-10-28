@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Route;
 use App\Models\Pemegang;
 use App\Models\User;
 use App\Http\Controllers\Api\BeritaAcaraController;
+use App\Http\Controllers\Api\BaPemeriksaanController; // <-- DITAMBAHKAN
 
 // Rute publik untuk login dan register
 Route::post('/register', [AuthController::class, 'register']);
@@ -78,10 +79,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/penilaian/pmp-umk/{kasus}', [PenilaianController::class, 'storePenilaian'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
-     // --- BLOK RUTE BERITA ACARA ---
+     // --- BLOK RUTE BERITA ACARA (TIDAK TERLAKSANA) ---
     Route::post('/berita-acara', [BeritaAcaraController::class, 'store'])
          ->middleware('role:Admin,Koordinator Lapangan');
     Route::get('/berita-acara/{beritaAcara}', [BeritaAcaraController::class, 'show'])
-         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');    
-});
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
+    // --- RUTE BERITA ACARA PEMERIKSAAN (MANUAL) --- <-- DITAMBAHKAN
+    Route::post('/ba-pemeriksaan', [BaPemeriksaanController::class, 'store'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+
+    Route::get('/ba-pemeriksaan/{penilaian}', [BaPemeriksaanController::class, 'show'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+    // --- AKHIR RUTE BERITA ACARA PEMERIKSAAN ---
+});
