@@ -27,6 +27,8 @@ class BaPemeriksaan extends Model
         'nomor_spt',
         'nama_pemegang',
         'tanda_tangan_pemegang',
+        'nama_koordinator',         // <-- DITAMBAHKAN
+        'tanda_tangan_koordinator', // <-- DITAMBAHKAN
     ];
 
     /**
@@ -40,4 +42,3 @@ class BaPemeriksaan extends Model
         return $this->belongsTo(Penilaian::class);
     }
 }
-

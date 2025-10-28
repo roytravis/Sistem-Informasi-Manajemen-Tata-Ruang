@@ -67,6 +67,9 @@ class BaPemeriksaanController extends Controller
             'nama_pemegang' => 'required|string|max:255',
             // Pastikan tanda tangan dikirim sebagai string (base64 data URL)
             'tanda_tangan_pemegang' => 'required|string',
+            // --- VALIDASI BARU ---
+            'nama_koordinator' => 'nullable|string|max:255',
+            'tanda_tangan_koordinator' => 'nullable|string',
         ]);
 
         try {
@@ -97,4 +100,3 @@ class BaPemeriksaanController extends Controller
     // public function update(Request $request, BaPemeriksaan $baPemeriksaan) { ... }
     // public function destroy(BaPemeriksaan $baPemeriksaan) { ... }
 }
-
