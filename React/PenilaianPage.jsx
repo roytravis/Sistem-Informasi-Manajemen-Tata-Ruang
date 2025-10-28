@@ -165,6 +165,18 @@ export default function PenilaianPage() {
                                                     </button>
                                                 )}
                                                 
+                                                {/* --- PENAMBAHAN TOMBOL BERITA ACARA PEMERIKSAAN --- */}
+                                                {/* Tampilkan HANYA JIKA sudah dinilai DAN tidak terlaksana */}
+                                                {sudahDinilai && !tidakTerlaksana && (
+                                                    <button
+                                                        onClick={() => navigate(`/penilaian/${p.kasus.id}/berita-acara-pemeriksaan`)}
+                                                        className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                    >
+                                                        Berita Acara
+                                                    </button>
+                                                )}
+                                                {/* --- AKHIR PENAMBAHAN --- */}
+                                                
                                                 {/* Tombol Edit dan Hapus tidak ditampilkan jika 'tidak terlaksana' */}
                                                 {!tidakTerlaksana && (
                                                     <button 
