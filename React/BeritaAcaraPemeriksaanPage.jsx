@@ -126,110 +126,135 @@ const DataRow = ({ label, value, unit = '' }) => (
  */
 export default function BeritaAcaraPemeriksaanPage() {
     const { id } = useParams(); // Ini adalah kasus_id
-    const [kasus, setKasus] = useState(null);
+    const [kasus, setKasus] = useState(null); // State untuk menyimpan data kasus lengkap
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // --- State Baru untuk Data Manual ---
+    // State untuk data manual BA
     const [manualData, setManualData] = useState({
         nomorBa: '',
         nomorSpt: '',
-        tandaTanganPemegang: null, // Akan menyimpan data URL base64
-        namaPemegangTTD: '', // Nama pemegang yang akan dicetak di bawah TTD
+        tandaTanganPemegang: null, 
+        namaPemegangTTD: '', 
         tandaTanganKoordinator: null,
         namaKoordinatorTTD: '',
     });
-    const [isDataSubmitted, setIsDataSubmitted] = useState(false); // Status form manual
+    const [isDataSubmitted, setIsDataSubmitted] = useState(false); // Kontrol tampilan form/preview
     const [manualError, setManualError] = useState('');
     const [submitManualLoading, setSubmitManualLoading] = useState(false);
-    const pemegangSigRef = useRef(null); // Ref untuk canvas tanda tangan pemegang
-    const koordinatorSigRef = useRef(null); // Ref untuk TTD koordinator
+    
+    // Refs untuk signature pads
+    const pemegangSigRef = useRef(null); 
+    const koordinatorSigRef = useRef(null); 
 
+    // Fetch data kasus dan BA yang mungkin sudah ada
     useEffect(() => {
         const fetchBaData = async () => {
             setLoading(true);
+            setError(''); 
             try {
+                // Panggil API untuk data kasus (yang sudah diperbaiki controllernya)
                 const response = await api.get(`/penilaian/pmp-umk/${id}`);
-                setKasus(response.data);
+                setKasus(response.data); // Simpan data kasus lengkap
                 
+                // Cek apakah ada data penilaian
                 if (!response.data.penilaian) {
                     setError('Data penilaian untuk kasus ini tidak ditemukan. Berita Acara tidak dapat dibuat.');
-                } else {
-                    let existingManualData = null;
-                    try {
-                        const baRes = await api.get(`/ba-pemeriksaan/${response.data.penilaian.id}`);
-                        if (baRes.data) {
-                            existingManualData = baRes.data;
-                        }
-                    } catch (fetchBaErr) {
-                        console.warn("Data BA pemeriksaan belum ada, akan dibuat baru.", fetchBaErr);
+                    setLoading(false); 
+                    return; 
+                } 
+                
+                // Coba ambil data BA yang mungkin sudah ada
+                let existingManualData = null;
+                try {
+                    const baRes = await api.get(`/ba-pemeriksaan/${response.data.penilaian.id}`);
+                    if (baRes.data) {
+                        existingManualData = baRes.data;
                     }
-                    
-                    if (existingManualData) {
-                        setManualData({
-                            nomorBa: existingManualData.nomor_ba || '',
-                            nomorSpt: existingManualData.nomor_spt || '',
-                            tandaTanganPemegang: existingManualData.tanda_tangan_pemegang || null, 
-                            namaPemegangTTD: existingManualData.nama_pemegang || response.data.pemegang?.nama_pelaku_usaha || '',
-                            tandaTanganKoordinator: existingManualData.tanda_tangan_koordinator || null,
-                            namaKoordinatorTTD: existingManualData.nama_koordinator || response.data.penanggung_jawab?.nama || '',
-                        });
-                    } else {
-                         setManualData(prev => ({
-                             ...prev,
-                             namaPemegangTTD: response.data.pemegang?.nama_pelaku_usaha || '',
-                             namaKoordinatorTTD: response.data.penanggung_jawab?.nama || '' 
-                         }));
+                } catch (fetchBaErr) {
+                    // Abaikan error jika BA belum ada, ini normal
+                    if (fetchBaErr.response?.status !== 404) {
+                         console.warn("Gagal fetch data BA:", fetchBaErr);
                     }
                 }
+                
+                // Isi form dengan data BA lama atau data default
+                if (existingManualData) {
+                    setManualData({
+                        nomorBa: existingManualData.nomor_ba || '',
+                        nomorSpt: existingManualData.nomor_spt || '',
+                        tandaTanganPemegang: existingManualData.tanda_tangan_pemegang || null, 
+                        // Gunakan nama pemegang dari BA jika ada, fallback ke data kasus
+                        namaPemegangTTD: existingManualData.nama_pemegang || response.data.pemegang?.nama_pelaku_usaha || '', 
+                        tandaTanganKoordinator: existingManualData.tanda_tangan_koordinator || null,
+                         // Gunakan nama koordinator dari BA jika ada, fallback ke data kasus
+                        namaKoordinatorTTD: existingManualData.nama_koordinator || response.data.penanggung_jawab?.nama || '',
+                    });
+                     // JANGAN set isDataSubmitted true agar form tetap tampil
+                     // setIsDataSubmitted(true); 
+                } else {
+                     // Isi nama default jika BA baru
+                     setManualData(prev => ({
+                         ...prev,
+                         namaPemegangTTD: response.data.pemegang?.nama_pelaku_usaha || '',
+                         // Nama koordinator diambil dari kasus yang sudah dimuat
+                         namaKoordinatorTTD: response.data.penanggung_jawab?.nama || '' 
+                     }));
+                }
+                
             } catch (err) {
-                setError('Gagal memuat data untuk Berita Acara.');
+                 // Tangani error fetch data kasus utama
+                setError(`Gagal memuat data kasus: ${err.response?.data?.message || err.message}`);
             } finally {
                 setLoading(false);
             }
         };
         fetchBaData();
-    }, [id]);
+    }, [id]); 
 
+    // Handler untuk tombol print
     const handlePrint = () => {
         window.print();
     };
 
+    // Mengolah data untuk ditampilkan di preview (menggunakan useMemo)
     const processedData = useMemo(() => {
-        // PERBAIKAN: Cukup periksa kasus saja, karena penilaian sudah dicek di useEffect
         if (!kasus) return null; 
 
         const { pemegang, penilaian, tim, penanggung_jawab } = kasus;
 
-        // Pastikan penilaian ada sebelum mencoba mengakses updated_at
-        const tglPenilaian = penilaian ? new Date(penilaian.updated_at) : new Date(); 
+        const tglBaInput = manualData.nomorBa ? new Date() : (penilaian ? new Date(penilaian.updated_at) : new Date()); 
         const tglOptions = { timeZone: 'Asia/Jakarta' };
-        const hari = tglPenilaian.toLocaleDateString('id-ID', { ...tglOptions, weekday: 'long' });
-        const tanggal = tglPenilaian.toLocaleDateString('id-ID', { ...tglOptions, day: 'numeric' });
-        const bulan = tglPenilaian.toLocaleDateString('id-ID', { ...tglOptions, month: 'long' });
-        const tahun = tglPenilaian.toLocaleDateString('id-ID', { ...tglOptions, year: 'numeric' });
+        const hari = tglBaInput.toLocaleDateString('id-ID', { ...tglOptions, weekday: 'long' });
+        const tanggal = tglBaInput.toLocaleDateString('id-ID', { ...tglOptions, day: 'numeric' });
+        const bulan = tglBaInput.toLocaleDateString('id-ID', { ...tglOptions, month: 'long' });
+        const tahun = tglBaInput.toLocaleDateString('id-ID', { ...tglOptions, year: 'numeric' });
 
-        const koordinator = penanggung_jawab;
-        const petugasLapangan = tim?.users?.filter(u => u.id !== koordinator?.id) || [];
+        // Koordinator diambil dari kasus (sudah dimuat API)
+        const koordinator = penanggung_jawab; 
+        // Petugas lapangan = anggota tim BUKAN koordinator
+        const petugasLapangan = tim?.users?.filter(u => u.id !== koordinator?.id) || []; 
         const semuaPetugas = [koordinator, ...petugasLapangan].filter(Boolean); 
 
-        // Pastikan penilaian ada sebelum mencoba mengakses pemeriksaan/pengukuran
         const pem = penilaian?.pemeriksaan || [];
         const png = penilaian?.pengukuran || [];
 
-        // Pastikan penilaian ada sebelum mencoba mengakses tanda_tangan_tim
+        // Signature map HANYA untuk TTD Petugas Lapangan dari PENILAIAN
         const signatureMap = (penilaian?.tanda_tangan_tim || []).reduce((acc, sig) => {
-            acc[sig.user_id] = sig.signature_path;
+            // Cek apakah user ID tanda tangan ada di dalam array petugasLapangan
+            if (petugasLapangan.some(p => p.id === sig.user_id)) {
+                 acc[sig.user_id] = sig.signature_path;
+            }
             return acc;
         }, {});
 
         return {
             pemegang,
-            penilaian, // Tetap sertakan penilaian untuk referensi lain jika perlu
-            koordinator,
-            petugasLapangan,
-            semuaPetugas,
-            signatureMap,
+            penilaian, 
+            koordinator, 
+            petugasLapangan, 
+            semuaPetugas, 
+            signatureMap, // Hanya TTD petugas dari penilaian
             tanggalBA: { hari, tanggal, bulan, tahun },
             dataPemeriksaan: {
                 alamat: pem[0]?.pernyataan_mandiri,
@@ -256,57 +281,60 @@ export default function BeritaAcaraPemeriksaanPage() {
                 jbb_samping: png[11]?.hasil_pengukuran,
             }
         };
-    }, [kasus]); // Dependensi hanya pada kasus
+    }, [kasus, manualData.nomorBa]); // Recalculate if kasus or nomorBa changes
 
+    // Handler perubahan input form manual
     const handleManualChange = (e) => {
         const { name, value } = e.target;
         setManualData(prev => ({ ...prev, [name]: value }));
     };
 
+    // Handler submit form manual
     const handleDataSubmit = async (e) => {
         e.preventDefault();
         setManualError('');
         
+        // Validasi field wajib
         if (!manualData.nomorBa.trim() || !manualData.nomorSpt.trim() || !manualData.namaPemegangTTD.trim()) {
             setManualError('Nomor Berita Acara, Nomor SPT, dan Nama Pemegang (untuk TTD) wajib diisi.');
             return;
         }
         
-        // Cek dulu apakah data penilaian ada sebelum melanjutkan
+        // Cek ID Penilaian
         if (!kasus?.penilaian?.id) {
              setManualError('Tidak dapat menyimpan BA karena ID Penilaian tidak ditemukan.');
              return;
         }
         
-        if (!manualData.tandaTanganPemegang && pemegangSigRef.current.isEmpty()) {
+        // Validasi TTD Pemegang (wajib jika canvas kosong & tidak ada ttd lama)
+        if (pemegangSigRef.current && pemegangSigRef.current.isEmpty() && !manualData.tandaTanganPemegang) {
             setManualError('Tanda tangan Pemegang Pernyataan Mandiri wajib diisi.');
             return;
         }
 
-        // PERBAIKAN: Gunakan kasus?.penanggung_jawab untuk cek koordinator
+        // Validasi TTD Koordinator (jika ada koordinator)
         const koordinatorExists = kasus?.penanggung_jawab; 
         if (koordinatorExists && !manualData.namaKoordinatorTTD.trim()) {
              setManualError('Nama Koordinator (untuk TTD) wajib diisi.');
             return;
         }
-         // Pastikan koordinatorSigRef.current tidak null sebelum memanggil isEmpty()
-        if (koordinatorExists && !manualData.tandaTanganKoordinator && (!koordinatorSigRef.current || koordinatorSigRef.current.isEmpty())) {
+        if (koordinatorExists && koordinatorSigRef.current && koordinatorSigRef.current.isEmpty() && !manualData.tandaTanganKoordinator) {
             setManualError('Tanda Tangan Koordinator Lapangan wajib diisi.');
             return;
         }
 
-        // Pastikan pemegangSigRef.current tidak null sebelum memanggil isEmpty() atau toDataURL()
+        // Ambil data TTD (baru atau lama)
         const ttdPemegangBase64 = pemegangSigRef.current && !pemegangSigRef.current.isEmpty() 
             ? pemegangSigRef.current.toDataURL() 
             : manualData.tandaTanganPemegang;
         
-        // Pastikan koordinatorSigRef.current tidak null sebelum memanggil isEmpty() atau toDataURL()
         const ttdKoordinatorBase64 = koordinatorExists 
             ? (koordinatorSigRef.current && !koordinatorSigRef.current.isEmpty() 
                 ? koordinatorSigRef.current.toDataURL() 
                 : manualData.tandaTanganKoordinator) 
             : null;
 
+        // Validasi ulang TTD (jika ttd lama null)
         if (!ttdPemegangBase64) {
              setManualError('Tanda tangan Pemegang Pernyataan Mandiri wajib diisi.');
              return;
@@ -316,8 +344,9 @@ export default function BeritaAcaraPemeriksaanPage() {
             return;
         }
 
+        // Siapkan data untuk dikirim ke API
         const dataToSave = {
-            penilaian_id: kasus.penilaian.id, // Ambil dari kasus yang sudah pasti ada
+            penilaian_id: kasus.penilaian.id, 
             nomor_ba: manualData.nomorBa,
             nomor_spt: manualData.nomorSpt,
             tanda_tangan_pemegang: ttdPemegangBase64, 
@@ -328,14 +357,16 @@ export default function BeritaAcaraPemeriksaanPage() {
 
         setSubmitManualLoading(true);
         try {
-            await api.post('/ba-pemeriksaan', dataToSave); 
-
+            // Panggil API untuk menyimpan data
+            const response = await api.post('/ba-pemeriksaan', dataToSave); 
+            
+            // Update state manualData dengan data dari response (termasuk TTD baru)
             setManualData(prev => ({
                 ...prev, 
-                tandaTanganPemegang: ttdPemegangBase64,
-                tandaTanganKoordinator: ttdKoordinatorBase64 
+                tandaTanganPemegang: response.data.tanda_tangan_pemegang, 
+                tandaTanganKoordinator: response.data.tanda_tangan_koordinator 
             }));
-            setIsDataSubmitted(true); // Tampilkan preview
+            setIsDataSubmitted(true); // Pindah ke tampilan preview
         } catch (err) {
             setManualError(err.response?.data?.message || 'Gagal menyimpan data manual. Coba lagi.');
         } finally {
@@ -343,44 +374,57 @@ export default function BeritaAcaraPemeriksaanPage() {
         }
     };
 
+    // ----- Tampilan Komponen -----
+
+    // Tampilkan loading jika data masih diambil
     if (loading) return <div className="text-center py-10">Memuat data...</div>;
-    // Tampilkan error utama jika ada, sebelum mengecek form
+    // Tampilkan error utama jika terjadi
     if (error) return <div className="bg-red-100 text-red-700 p-4 rounded-lg">{error}</div>; 
-    // Jika tidak loading dan tidak error utama, baru cek form/preview
-    if (!kasus) return <div className="text-center py-10">Data kasus tidak ditemukan.</div>; // Tambahan cek kasus
+    // Tampilkan jika data kasus tidak ada (setelah loading selesai)
+    if (!kasus) return <div className="text-center py-10">Data kasus tidak ditemukan.</div>; 
 
-
-    // --- Render Form Input Manual Jika Belum Submit ---
+    // --- Render Form Input Jika isDataSubmitted false ---
     if (!isDataSubmitted) {
         return (
             <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg mt-8">
+                 {/* Tombol Kembali */}
                  <div className="mb-6 flex justify-between items-center no-print">
                     <Link to="/penilaian" className="text-blue-600 hover:underline">&larr; Kembali</Link>
                 </div>
+                {/* Judul Form */}
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Input Data Berita Acara</h2>
+                {/* Tampilkan error form jika ada */}
                 {manualError && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{manualError}</p>}
+                
+                {/* Form Input */}
                 <form onSubmit={handleDataSubmit} className="space-y-4">
+                    {/* Input Nomor BA */}
                     <div>
                         <label htmlFor="nomorBa" className="block text-sm font-medium text-gray-700">Nomor Berita Acara *</label>
                         <input type="text" id="nomorBa" name="nomorBa" value={manualData.nomorBa} onChange={handleManualChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
                     </div>
+                    {/* Input Nomor SPT */}
                     <div>
                         <label htmlFor="nomorSpt" className="block text-sm font-medium text-gray-700">Nomor Surat Perintah Tugas *</label>
                         <input type="text" id="nomorSpt" name="nomorSpt" value={manualData.nomorSpt} onChange={handleManualChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
                     </div>
+                    {/* Input Nama Pemegang TTD */}
                      <div>
                         <label htmlFor="namaPemegangTTD" className="block text-sm font-medium text-gray-700">Nama Pemegang (untuk TTD) *</label>
                         <input type="text" id="namaPemegangTTD" name="namaPemegangTTD" value={manualData.namaPemegangTTD} onChange={handleManualChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
                         <p className="text-xs text-gray-500 mt-1">Nama ini akan dicetak di bawah tanda tangan pemegang.</p>
                     </div>
+                    {/* Input TTD Pemegang */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Tanda Tangan Pemegang Pernyataan Mandiri / Wakilnya *</label>
+                        {/* Tampilkan TTD lama jika ada */}
                         {manualData.tandaTanganPemegang && (
                             <div className="mb-2 p-2 border rounded-md inline-block">
                                 <p className='text-xs text-gray-500 mb-1'>Tanda Tangan Tersimpan:</p>
                                 <img src={manualData.tandaTanganPemegang} alt="TTD Pemegang Tersimpan" className="h-20 border"/>
                             </div>
                         )}
+                        {/* Canvas TTD Pemegang */}
                         <div className="mt-1 border border-gray-300 rounded-md bg-gray-50 pemegang-signature-canvas">
                             <SignatureCanvas 
                                 ref={pemegangSigRef} 
@@ -388,24 +432,38 @@ export default function BeritaAcaraPemeriksaanPage() {
                                 canvasProps={{ className: 'w-full h-40' }} 
                             />
                         </div>
+                        {/* Tombol Ulangi TTD Pemegang */}
                         <button type="button" onClick={() => { pemegangSigRef.current?.clear(); setManualData(prev => ({...prev, tandaTanganPemegang: null})); }} className="text-sm text-blue-600 hover:underline mt-1">Ulangi Tanda Tangan</button>
                     </div>
 
-                    {/* PERBAIKAN: Gunakan kasus?.penanggung_jawab untuk kondisi */}
-                    {kasus?.penanggung_jawab && (
+                    {/* --- Input TTD Koordinator (Muncul jika ada koordinator di data 'kasus') --- */}
+                    {kasus?.penanggung_jawab && ( 
                         <>
+                            {/* Input Nama Koordinator TTD */}
                             <div>
                                 <label htmlFor="namaKoordinatorTTD" className="block text-sm font-medium text-gray-700">Nama Koordinator Lapangan (untuk TTD) *</label>
-                                <input type="text" id="namaKoordinatorTTD" name="namaKoordinatorTTD" value={manualData.namaKoordinatorTTD} onChange={handleManualChange} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
+                                <input 
+                                    type="text" 
+                                    id="namaKoordinatorTTD" 
+                                    name="namaKoordinatorTTD" 
+                                    // Pastikan value diambil dari manualData
+                                    value={manualData.namaKoordinatorTTD} 
+                                    onChange={handleManualChange} 
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" 
+                                    required 
+                                />
                             </div>
+                            {/* Input TTD Koordinator */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Tanda Tangan Koordinator Lapangan *</label>
+                                {/* Tampilkan TTD lama jika ada */}
                                 {manualData.tandaTanganKoordinator && (
                                     <div className="mb-2 p-2 border rounded-md inline-block">
                                         <p className='text-xs text-gray-500 mb-1'>Tanda Tangan Tersimpan:</p>
                                         <img src={manualData.tandaTanganKoordinator} alt="TTD Koordinator Tersimpan" className="h-20 border"/>
                                     </div>
                                 )}
+                                {/* Canvas TTD Koordinator */}
                                 <div className="mt-1 border border-gray-300 rounded-md bg-gray-50 koordinator-signature-canvas">
                                     <SignatureCanvas 
                                         ref={koordinatorSigRef} 
@@ -413,11 +471,14 @@ export default function BeritaAcaraPemeriksaanPage() {
                                         canvasProps={{ className: 'w-full h-40' }} 
                                     />
                                 </div>
+                                {/* Tombol Ulangi TTD Koordinator */}
                                 <button type="button" onClick={() => { koordinatorSigRef.current?.clear(); setManualData(prev => ({...prev, tandaTanganKoordinator: null})); }} className="text-sm text-blue-600 hover:underline mt-1">Ulangi Tanda Tangan</button>
                             </div>
                         </>
                     )}
+                    {/* --- Akhir Input TTD Koordinator --- */}
 
+                    {/* Tombol Submit */}
                     <div className="flex justify-end pt-4">
                         <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg" disabled={submitManualLoading}>
                             {submitManualLoading ? 'Menyimpan...' : 'Lanjutkan ke Preview'}
@@ -428,10 +489,11 @@ export default function BeritaAcaraPemeriksaanPage() {
         );
     }
 
-    // --- Render Preview Jika Data Manual Sudah Submit ---
-    // PERBAIKAN: Cek processedData setelah form input dirender
-    if (!processedData) return <div className="text-center py-10">Data penilaian tidak lengkap untuk preview.</div>; 
+    // --- Render Preview Jika isDataSubmitted true ---
+    // Pastikan processedData sudah siap sebelum render preview
+    if (!processedData) return <div className="text-center py-10">Menyiapkan data preview...</div>; 
 
+    // Destructuring data untuk preview
     const { 
         pemegang, koordinator, petugasLapangan, semuaPetugas, signatureMap, 
         tanggalBA, dataPemeriksaan, dataPengukuran 
@@ -439,15 +501,20 @@ export default function BeritaAcaraPemeriksaanPage() {
 
     return (
         <div>
+            {/* Sisipkan style cetak */}
             <PrintStyles />
             
+            {/* Tombol Aksi di Atas Preview */}
             <div className="mb-6 flex justify-between items-center no-print px-4 py-3 bg-white shadow-sm sm:px-6 lg:px-8">
                  <div>
+                    {/* Tombol Kembali ke Form Input */}
                     <button onClick={() => setIsDataSubmitted(false)} className="text-blue-600 hover:underline text-sm mr-4">
                         &larr; Ubah Data Manual
                     </button>
+                    {/* Tombol Kembali ke Dashboard */}
                     <Link to="/penilaian" className="text-blue-600 hover:underline text-sm">&larr; Kembali ke Dashboard</Link>
                 </div>
+                {/* Tombol Cetak */}
                 <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
                     Cetak / Simpan PDF
                 </button>
@@ -455,7 +522,7 @@ export default function BeritaAcaraPemeriksaanPage() {
 
             {/* --- Area Preview Dokumen --- */}
             <div className="printable-area max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8 md:p-12 font-serif text-black">
-                {/* Header */}
+                {/* Header BA */}
                 <div className="text-center uppercase font-bold">
                     <h2 className="text-lg tracking-wider">BERITA ACARA PEMERIKSAAN DAN PENGUKURAN</h2>
                     <h3 className="text-lg tracking-wider">PERNYATAAN MANDIRI PELAKU USAHA MIKRO DAN KECIL</h3>
@@ -463,34 +530,36 @@ export default function BeritaAcaraPemeriksaanPage() {
                     <p className="text-base normal-case">Nomor: {manualData.nomorBa || '..............................'}</p>
                 </div>
 
-                {/* Body */}
+                {/* Body BA */}
                 <div className="mt-8 text-justify leading-loose">
+                    {/* Paragraf Pembuka */}
                     <p className="indent-8">
                         Pada hari ini, {tanggalBA.hari} tanggal {tanggalBA.tanggal} bulan {tanggalBA.bulan} tahun {tanggalBA.tahun}, 
                         kami yang bertanda tangan di bawah ini:
                     </p>
                     
+                    {/* Daftar Tim */}
                     <div className="mt-4 ml-8 space-y-4 text-sm">
-                        {/* Periksa apakah semuaPetugas ada sebelum mapping */}
-                        {semuaPetugas && semuaPetugas.map((petugas) => ( 
+                        {semuaPetugas && semuaPetugas.length > 0 ? semuaPetugas.map((petugas) => ( 
                             <div key={petugas.id} className="grid grid-cols-[80px_10px_auto]">
                                 <span>Nama</span><span>:</span><span className="font-semibold">{petugas.nama}</span>
                                 <span>NIP/NIK</span><span>:</span><span>{petugas.nip || '-'}</span>
                                 <span>Jabatan</span><span>:</span><span>{petugas.pivot?.jabatan_di_tim || petugas.role}</span>
                            </div>
-                        ))}
+                        )) : <p>Data tim tidak tersedia.</p>}
                     </div>
 
+                    {/* Paragraf Berdasarkan SPT */}
                     <p className="mt-4 indent-8">
                         Berdasarkan Surat Perintah Tugas Nomor {manualData.nomorSpt || '.....................'}, telah melakukan pemeriksaan dan
                         pengukuran terhadap lokasi kegiatan Pemanfaatan Ruang dengan hasil sebagai berikut:
                     </p>
 
+                    {/* Hasil Pemeriksaan & Pengukuran */}
                     <h4 className="font-bold text-center mt-6 mb-2">Hasil Pemeriksaan dan Pengukuran</h4>
+                    {/* Data Pemegang */}
                     <h5 className="font-semibold mb-2">Pernyataan Mandiri Pelaku Usaha Mikro dan Kecil</h5>
-                    
-                    {/* Periksa apakah pemegang ada sebelum mengakses propertinya */}
-                    {pemegang && ( 
+                    {pemegang ? ( 
                     <table className="w-full border border-gray-300 text-sm mb-4">
                         <tbody>
                             <DataRow label="Nama Pelaku Usaha" value={pemegang.nama_pelaku_usaha} />
@@ -500,8 +569,9 @@ export default function BeritaAcaraPemeriksaanPage() {
                             <DataRow label="Email" value={pemegang.email} />
                         </tbody>
                     </table>
-                    )}
+                    ) : <p>Data pemegang tidak tersedia.</p>}
 
+                    {/* Data Pemeriksaan */}
                     <h5 className="font-semibold mb-2 mt-4">A. Pemeriksaan</h5>
                     <table className="w-full border border-gray-300 text-sm mb-4">
                         <tbody>
@@ -516,6 +586,7 @@ export default function BeritaAcaraPemeriksaanPage() {
                         </tbody>
                     </table>
                     
+                    {/* Data Pengukuran */}
                     <h5 className="font-semibold mb-2 mt-4">B. Pengukuran (Opsional)</h5>
                     <table className="w-full border border-gray-300 text-sm">
                         <tbody>
@@ -534,6 +605,7 @@ export default function BeritaAcaraPemeriksaanPage() {
                         </tbody>
                     </table>
 
+                    {/* Paragraf Penutup */}
                     <p className="mt-6 indent-8">
                         Demikian Berita Acara ini dibuat dalam rangkap secukupnya untuk dipergunakan sebagaimana mestinya.
                     </p>
@@ -541,6 +613,7 @@ export default function BeritaAcaraPemeriksaanPage() {
 
                 {/* --- Bagian Tanda Tangan --- */}
                 <div className="mt-12">
+                    {/* TTD Pemegang dan Koordinator */}
                     <div className="grid grid-cols-2 gap-x-8 gap-y-10 text-center">
                         {/* Tanda Tangan Pemegang */}
                         <div className="signature-block mt-4">
@@ -552,7 +625,6 @@ export default function BeritaAcaraPemeriksaanPage() {
                                     <span className="text-gray-400 text-sm">(Tanda Tangan Belum Ada)</span>
                                 )}
                             </div>
-                            {/* Periksa apakah pemegang ada */}
                             <p className="font-bold underline">({manualData.namaPemegangTTD || pemegang?.nama_pelaku_usaha || '......................'})</p> 
                         </div>
                         
@@ -571,16 +643,19 @@ export default function BeritaAcaraPemeriksaanPage() {
                                 <p>NIP: {koordinator.nip || '..............................'}</p>
                             </div>
                         )}
+                         {/* Placeholder jika tidak ada koordinator */}
+                         {!koordinator && <div className="signature-block mt-4"></div>}
                     </div>
                     
-                    {/* Tanda Tangan Petugas Lapangan (dari penilaian) */}
+                    {/* Tanda Tangan Petugas Lapangan */}
                     <div className="grid grid-cols-2 gap-x-8 gap-y-10 mt-10 text-center">
-                        {/* Periksa apakah petugasLapangan ada sebelum mapping */}
-                        {petugasLapangan && petugasLapangan.map((petugas, index) => ( 
+                        {/* Gunakan petugasLapangan (sudah difilter) */}
+                        {petugasLapangan && petugasLapangan.length > 0 ? petugasLapangan.map((petugas, index) => ( 
                             <div key={petugas.id} className="signature-block mt-4">
                                 <p>Petugas Lapangan {index + 1}</p>
                                 <div className="h-28 w-full my-2 flex items-center justify-center signature-image-container"> 
-                                    {signatureMap[petugas.id] ? (
+                                    {/* Gunakan signatureMap (sudah difilter) */}
+                                    {signatureMap[petugas.id] ? ( 
                                         <img src={`http://127.0.0.1:8000/storage/${signatureMap[petugas.id]}`} alt={`Tanda Tangan ${petugas.nama}`} className="h-full object-contain"/>
                                     ) : (
                                         <span className="text-gray-400 text-sm">(Belum TTD di Penilaian)</span>
@@ -589,10 +664,18 @@ export default function BeritaAcaraPemeriksaanPage() {
                                 <p className="font-bold underline">({petugas.nama})</p>
                                 <p>NIP/NIK: {petugas.nip || '..............................'}</p>
                             </div>
-                        ))}
+                        )) : (
+                            <>
+                             <div className="signature-block mt-4"><p className="text-gray-400 text-sm">(Tidak ada Petugas Lapangan 1)</p></div>
+                             <div className="signature-block mt-4"><p className="text-gray-400 text-sm">(Tidak ada Petugas Lapangan 2)</p></div>
+                            </>
+                        )}
+                        {/* Placeholder ganjil */}
+                        {petugasLapangan && petugasLapangan.length % 2 !== 0 && <div className="signature-block mt-4"></div>}
                     </div>
                 </div>
             </div>
+            {/* --- Akhir Area Preview --- */}
         </div>
     );
 }
