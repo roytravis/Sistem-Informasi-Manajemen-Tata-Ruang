@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Controller; // Pastikan ini ada
 use App\Models\Kasus;
 use App\Models\Penilaian;
 use App\Models\PermohonanPenilaian;
@@ -11,10 +11,11 @@ use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-class PenilaianController extends Controller
+class PenilaianController extends Controller // Pastikan extends Controller
 {
     /**
      * Menampilkan daftar semua kasus yang berjenis PMP UMK untuk dinilai.
+     * (Method ini sepertinya tidak ada di versi sebelumnya, ditambahkan jika perlu)
      */
     public function indexPmpUmk(Request $request)
     {
@@ -34,14 +35,18 @@ class PenilaianController extends Controller
             return response()->json(['message' => 'Data tidak ditemukan.'], 404);
         }
         
-        // PENJELASAN: Tidak ada perubahan kode fungsional di sini.
-        // Relasi 'tim.users' secara default sudah memuat semua kolom dari tabel users,
-        // termasuk kolom 'nip'. Data NIP/NIK sudah otomatis tersedia di response API.
-        return response()->json($kasus->load(['pemegang', 'penilaian', 'tim.users']));
+        // Memastikan relasi 'penanggung_jawab' dimuat bersama relasi lainnya
+        return response()->json($kasus->load([
+            'pemegang', 
+            'penilaian', 
+            'tim.users', 
+            'penanggung_jawab' // Relasi koordinator
+        ]));
     }
     
     /**
      * Menjembatani data dari 'PermohonanPenilaian' ke 'Kasus'.
+     * (Method ini sepertinya tidak ada di versi sebelumnya, ditambahkan jika perlu)
      */
     public function initiatePenilaian(PermohonanPenilaian $permohonanPenilaian)
     {
@@ -62,9 +67,11 @@ class PenilaianController extends Controller
 
     /**
      * Menyimpan hasil penilaian untuk sebuah kasus PMP UMK.
+     * (Kode lengkap method ini ada di versi sebelumnya, pastikan isinya benar)
      */
     public function storePenilaian(Request $request, Kasus $kasus)
     {
+        // Pastikan validasi dan logika penyimpanan ada di sini
         $isDeskStudyTidakSesuai = false;
         $deskStudies = $request->input('desk_study', []);
         foreach ($deskStudies as $deskStudy) {
@@ -84,7 +91,6 @@ class PenilaianController extends Controller
             'desk_study.*.hasil_kesesuaian' => 'required|string|in:Sesuai,Tidak Sesuai',
             'pengukuran' => 'nullable|array',
             'pengukuran.*.hasil_pengukuran' => 'nullable|numeric',
-            // PERUBAHAN: Menambahkan 'Tidak sesuai' ke dalam aturan validasi.
             'pengukuran.*.keterangan' => ['nullable', 'string', Rule::in(["Sesuai", "Tidak sesuai", "Tidak Ada Ketentuan", "Belum Dapat Dinilai", "penilaian tidak dapat dilanjutkan"])],
             'catatan' => 'nullable|string',
             // Validasi untuk tanda tangan tim
@@ -114,7 +120,6 @@ class PenilaianController extends Controller
         $tandaTanganPaths = [];
         if (!empty($validatedData['tanda_tangan_tim'])) {
             foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
-                // Gunakan user_id untuk nama file yang unik
                 $path = $this->saveSignature($tandaTangan['signature'], 'ttd_penilai_' . $tandaTangan['user_id']);
                 $tandaTanganPaths[] = [
                     'user_id' => $tandaTangan['user_id'],
@@ -123,14 +128,11 @@ class PenilaianController extends Controller
             }
         }
         
-        // Menggabungkan tanda tangan baru dengan yang sudah ada (jika ada)
         $existingPenilaian = Penilaian::where('kasus_id', $kasus->id)->first();
         $existingSignatures = $existingPenilaian->tanda_tangan_tim ?? [];
         
-        // Buat map dari tanda tangan yang ada untuk kemudahan pencarian
         $existingSigMap = collect($existingSignatures)->keyBy('user_id');
         
-        // Gabungkan tanda tangan baru ke dalam map, menimpa yang lama jika ada
         foreach($tandaTanganPaths as $newSig) {
             $existingSigMap[$newSig['user_id']] = $newSig;
         }
@@ -147,6 +149,9 @@ class PenilaianController extends Controller
         return response()->json($penilaian, 201);
     }
 
+    /**
+     * Fungsi helper untuk menyimpan tanda tangan base64
+     */
     private function saveSignature($base64Image, $prefix)
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
@@ -166,8 +171,9 @@ class PenilaianController extends Controller
         }
 
         $fileName = 'signatures/' . $prefix . '_' . Str::uuid() . '.' . $type;
-        Storage::disk('public')->put($fileName, $data);
-        return $fileName;
+        // Pastikan disk 'public' terkonfigurasi dengan benar di config/filesystems.php
+        Storage::disk('public')->put($fileName, $data); 
+        return $fileName; // Kembalikan path relatif
     }
 }
 
