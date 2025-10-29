@@ -178,8 +178,10 @@ export default function BeritaAcaraPemeriksaanPage() {
                     }
                 }
                 
+                // --- PERUBAHAN LOGIKA ---
                 // Isi form dengan data BA lama atau data default
                 if (existingManualData) {
+                    // Jika BA sudah ada, isi state manualData
                     setManualData({
                         nomorBa: existingManualData.nomor_ba || '',
                         nomorSpt: existingManualData.nomor_spt || '',
@@ -190,17 +192,20 @@ export default function BeritaAcaraPemeriksaanPage() {
                          // Gunakan nama koordinator dari BA jika ada, fallback ke data kasus
                         namaKoordinatorTTD: existingManualData.nama_koordinator || response.data.penanggung_jawab?.nama || '',
                     });
-                     // JANGAN set isDataSubmitted true agar form tetap tampil
-                     // setIsDataSubmitted(true); 
+                     // Set state untuk langsung menampilkan PREVIEW
+                     setIsDataSubmitted(true); 
                 } else {
-                     // Isi nama default jika BA baru
+                     // Jika BA baru, isi nama default dari data kasus
                      setManualData(prev => ({
                          ...prev,
                          namaPemegangTTD: response.data.pemegang?.nama_pelaku_usaha || '',
                          // Nama koordinator diambil dari kasus yang sudah dimuat
                          namaKoordinatorTTD: response.data.penanggung_jawab?.nama || '' 
                      }));
+                     // Pastikan state menampilkan mode INPUT
+                     setIsDataSubmitted(false);
                 }
+                // --- AKHIR PERUBAHAN LOGIKA ---
                 
             } catch (err) {
                  // Tangani error fetch data kasus utama
@@ -679,4 +684,3 @@ export default function BeritaAcaraPemeriksaanPage() {
         </div>
     );
 }
-
