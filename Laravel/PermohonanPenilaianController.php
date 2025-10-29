@@ -15,11 +15,12 @@ class PermohonanPenilaianController extends Controller
         // PERBAIKAN: Eager load relasi 'beritaAcara'
         $query = PermohonanPenilaian::with(['pemegang', 'kasus.penilaian', 'beritaAcara']);
 
+        // --- PERUBAHAN LOGIKA FILTER 'PENDING' ---
         if ($request->query('status') === 'pending') {
-            $query->whereDoesntHave('kasus.penilaian');
-            // Pastikan juga tidak menampilkan yang statusnya 'Penilaian Tidak Terlaksana'
-            $query->where('status', '!=', 'Penilaian Tidak Terlaksana');
+            // Tampilkan yang statusnya 'Baru', 'Menunggu Penilaian', atau 'Draft'
+            $query->whereIn('status', ['Baru', 'Menunggu Penilaian', 'Draft']);
         }
+        // --- AKHIR PERUBAHAN ---
 
         $penilaians = $query->latest()->paginate(15);
         
@@ -36,7 +37,7 @@ class PermohonanPenilaianController extends Controller
 
         $validatedData['nomor_permohonan'] = now()->timestamp . '-' . Str::random(5);
         
-        // Status default saat dibuat manual adalah 'Baru' (atau 'Menunggu Penilaian')
+        // Status default saat dibuat manual adalah 'Menunggu Penilaian'
         $validatedData['status'] = 'Menunggu Penilaian';
 
 

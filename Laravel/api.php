@@ -79,6 +79,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/penilaian/pmp-umk/{kasus}', [PenilaianController::class, 'storePenilaian'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
+    // --- PENAMBAHAN: Rute untuk Save Draft ---
+    Route::post('/penilaian/pmp-umk/{kasus}/draft', [PenilaianController::class, 'saveDraft'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+    // --- AKHIR PENAMBAHAN ---
+
      // --- BLOK RUTE BERITA ACARA (TIDAK TERLAKSANA) ---
     Route::post('/berita-acara', [BeritaAcaraController::class, 'store'])
          ->middleware('role:Admin,Koordinator Lapangan');

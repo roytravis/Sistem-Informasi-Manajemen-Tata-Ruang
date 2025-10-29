@@ -55,13 +55,19 @@ class PenilaianController extends Controller // Pastikan extends Controller
             ['nomor_permohonan' => $permohonanPenilaian->nomor_permohonan],
             [
                 'jenis' => 'PMP_UMK',
-                'status' => 'Menunggu Penilaian',
+                // JANGAN ubah status permohonan di sini, biarkan apa adanya (bisa jadi 'Draft')
+                // 'status' => 'Menunggu Penilaian', // Baris ini sebaiknya disesuaikan
                 'pemegang_id' => $permohonanPenilaian->pemegang_id,
                 'tim_id' => $permohonanPenilaian->tim_id,
                 'penanggung_jawab_id' => $permohonanPenilaian->penanggung_jawab_id,
                 'prioritas_score' => $permohonanPenilaian->prioritas_score,
             ]
         );
+         // Jika permohonan statusnya 'Baru', update jadi 'Menunggu Penilaian'
+        if ($permohonanPenilaian->status == 'Baru') {
+            $permohonanPenilaian->update(['status' => 'Menunggu Penilaian']);
+        }
+
         return response()->json(['kasus_id' => $kasus->id]);
     }
 
@@ -144,10 +150,59 @@ class PenilaianController extends Controller // Pastikan extends Controller
             $payload
         );
         
+        // --- PERUBAHAN ---
+        // 1. Update status kasus (existing)
         $kasus->update(['status' => 'Menunggu Verifikasi']);
+        
+        // 2. Update status permohonan terkait (NEW)
+        $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
+        if ($permohonan) {
+            $permohonan->update(['status' => 'Menunggu Penilaian']);
+        }
+        // --- AKHIR PERUBAHAN ---
 
         return response()->json($penilaian, 201);
     }
+
+    /**
+     * --- FITUR BARU: Menyimpan Draft Penilaian ---
+     */
+    public function saveDraft(Request $request, Kasus $kasus)
+    {
+        // 1. Validasi data draft (hanya desk_study dan catatan)
+        $validatedData = $request->validate([
+            'desk_study' => 'nullable|array',
+            'desk_study.*.pernyataan_mandiri_lokasi' => 'nullable|string',
+            'desk_study.*.pernyataan_mandiri_jenis' => 'nullable|string',
+            'desk_study.*.ketentuan_rtr_jenis' => 'nullable|string',
+            'desk_study.*.ketentuan_rtr_arahan' => 'nullable|string',
+            'desk_study.*.hasil_kesesuaian' => 'nullable|string|in:Sesuai,Tidak Sesuai',
+            'catatan' => 'nullable|string',
+        ]);
+
+        // 2. Siapkan data untuk disimpan
+        $payload = [
+            'desk_study' => $validatedData['desk_study'] ?? null,
+            'catatan' => $validatedData['catatan'] ?? null,
+            // Biarkan 'pemeriksaan' dan 'pengukuran' apa adanya (jangan null)
+        ];
+
+        // 3. Simpan atau perbarui data Penilaian (parsial)
+        $penilaian = Penilaian::updateOrCreate(
+            ['kasus_id' => $kasus->id],
+            $payload
+        );
+
+        // 4. Update status PermohonanPenilaian terkait menjadi 'Draft'
+        $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
+        if ($permohonan) {
+            $permohonan->update(['status' => 'Draft']);
+        }
+
+        return response()->json($penilaian, 200);
+    }
+    // --- AKHIR FITUR BARU ---
+
 
     /**
      * Fungsi helper untuk menyimpan tanda tangan base64
@@ -176,4 +231,3 @@ class PenilaianController extends Controller // Pastikan extends Controller
         return $fileName; // Kembalikan path relatif
     }
 }
-
