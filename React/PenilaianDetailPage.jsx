@@ -369,6 +369,7 @@ export default function PenilaianDetailPage() {
     const [kasus, setKasus] = useState(null);
     const [loading, setLoading] = useState(true);
     const [submitLoading, setSubmitLoading] = useState(false);
+    const [draftLoading, setDraftLoading] = useState(false); // --- PENAMBAHAN: State loading untuk draft
     const [error, setError] = useState('');
     const [validationErrors, setValidationErrors] = useState({});
 
@@ -438,7 +439,18 @@ export default function PenilaianDetailPage() {
             const kegiatan = pemegang?.kegiatan || '';
 
             if (kasusData.penilaian) {
-                setIsReadOnly(true);
+                // --- PERUBAHAN: Cek status permohonan ---
+                // Jika status 'Draft', JANGAN set isReadOnly
+                const permohonanRes = await api.get('/permohonan-penilaian'); // Ini kurang ideal, lebih baik jika API kasus mengembalikan status permohonan
+                const permohonanTerkait = permohonanRes.data.data.find(p => p.nomor_permohonan === kasusData.nomor_permohonan);
+
+                if (permohonanTerkait && permohonanTerkait.status === 'Draft') {
+                    setIsReadOnly(false);
+                } else {
+                    setIsReadOnly(true);
+                }
+                // --- AKHIR PERUBAHAN ---
+
                 setInitialPenilaianExists(true);
 
                 let deskStudyData;
@@ -452,7 +464,12 @@ export default function PenilaianDetailPage() {
                     }];
                 }
 
-                const mergedDeskStudy = deskStudyData;
+                // Ambil data draft desk_study, fallback ke data awal
+                const mergedDeskStudy = deskStudyData.map((item, index) => ({
+                    ...item,
+                    ...(kasusData.penilaian.desk_study?.[index] || {})
+                }));
+
 
                 const mergedPemeriksaan = Array.from({ length: 8 }, (_, i) => ({
                     hasil_pemeriksaan: 'Sesuai',
@@ -478,6 +495,7 @@ export default function PenilaianDetailPage() {
                     setSignatures(sigs);
                 }
             } else {
+                 setIsReadOnly(false); // Form baru, bisa diedit
                 setFormData({
                     desk_study: [{
                         pernyataan_mandiri_lokasi: fullAlamat,
@@ -495,6 +513,7 @@ export default function PenilaianDetailPage() {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchDetail();
@@ -528,6 +547,33 @@ export default function PenilaianDetailPage() {
 
         return errors;
     };
+
+    // --- PENAMBAHAN: Fungsi untuk Save Draft ---
+    const handleSaveDraft = async () => {
+        setDraftLoading(true);
+        setError('');
+        setValidationErrors({}); // Hapus error validasi, karena ini draft
+
+        // Hanya ambil data desk_study dan catatan
+        const draftData = {
+            desk_study: formData.desk_study,
+            catatan: formData.catatan
+            // Tidak perlu kirim 'pemeriksaan' atau 'pengukuran'
+        };
+
+        try {
+            // Panggil API draft baru
+            await api.post(`/penilaian/pmp-umk/${id}/draft`, draftData);
+            alert('Draft berhasil disimpan!');
+            navigate('/penilaian'); // Redirect ke dashboard sesuai spesifikasi
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || 'Terjadi kesalahan saat menyimpan draft.';
+            setError(errorMsg);
+        } finally {
+            setDraftLoading(false);
+        }
+    };
+    // --- AKHIR PENAMBAHAN ---
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -579,7 +625,8 @@ export default function PenilaianDetailPage() {
             await api.post(`/penilaian/pmp-umk/${id}`, submissionData);
             alert(initialPenilaianExists ? 'Perubahan berhasil disimpan!' : 'Penilaian berhasil disimpan!');
             setIsReadOnly(true);
-            fetchDetail();
+            fetchDetail(); // Re-fetch data
+            navigate('/penilaian'); // Arahkan kembali ke dashboard setelah submit final
         } catch (err) {
              const errorMsg = err.response?.data?.message || 'Terjadi kesalahan saat menyimpan penilaian.';
              setError(errorMsg);
@@ -793,9 +840,24 @@ export default function PenilaianDetailPage() {
                     </div>
 
                     {!isReadOnly && (
-                        <div className="flex justify-end pt-3 print:hidden no-print"> {/* Kurangi pt */}
-                            <button type="submit" disabled={submitLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md disabled:bg-blue-400">
-                                {submitLoading ? 'Menyimpan...' : (initialPenilaianExists ? 'Simpan Perubahan' : 'Simpan Hasil Penilaian')}
+                        <div className="flex justify-end pt-3 print:hidden no-print space-x-3"> {/* PENAMBAHAN: wrapper flex + space-x */}
+                            {/* --- PENAMBAHAN: Tombol Save Draft --- */}
+                            <button 
+                                type="button" 
+                                onClick={handleSaveDraft} 
+                                disabled={draftLoading || submitLoading} 
+                                className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md disabled:bg-gray-400"
+                            >
+                                {draftLoading ? 'Menyimpan...' : 'Save Draft'}
+                            </button>
+                            {/* --- AKHIR PENAMBAHAN --- */}
+
+                            <button 
+                                type="submit" 
+                                disabled={submitLoading || draftLoading} 
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md disabled:bg-blue-400"
+                            >
+                                {submitLoading ? 'Menyimpan...' : (initialPenilaianExists ? 'Simpan Perubahan Final' : 'Simpan Hasil Penilaian')}
                             </button>
                         </div>
                     )}
