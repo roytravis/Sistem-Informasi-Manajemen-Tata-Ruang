@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\HttpControllers\Api;
 
 use App\Http\Controllers\Controller; // Pastikan ini ada
 use App\Models\Kasus;
@@ -150,16 +150,17 @@ class PenilaianController extends Controller // Pastikan extends Controller
             $payload
         );
         
-        // --- PERUBAHAN ---
+        // --- PERBAIKAN LOGIKA ---
         // 1. Update status kasus (existing)
         $kasus->update(['status' => 'Menunggu Verifikasi']);
         
         // 2. Update status permohonan terkait (NEW)
         $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
         if ($permohonan) {
-            $permohonan->update(['status' => 'Menunggu Penilaian']);
+            // DIUBAH: Status diubah menjadi 'Menunggu Verifikasi' agar tidak muncul di tab 'pending'
+            $permohonan->update(['status' => 'Menunggu Verifikasi']);
         }
-        // --- AKHIR PERUBAHAN ---
+        // --- AKHIR PERBAIKAN ---
 
         return response()->json($penilaian, 201);
     }
