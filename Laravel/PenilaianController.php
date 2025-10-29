@@ -1,21 +1,24 @@
 <?php
 
-namespace App\HttpControllers\Api;
+// 1. Perbaikan Namespace
+namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller; // Pastikan ini ada
-use App\Models\Kasus;
-use App\Models\Penilaian;
-use App\Models\PermohonanPenilaian;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Storage;
+// Tambahkan use DB dan use Log
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log; // Ditambahkan untuk logging
+use App\Http\Controllers\Controller;
+use App\Models\Kasus; // Pastikan ini diimport
+use App\Models\Penilaian; // Pastikan ini diimport
+use App\Models\PermohonanPenilaian; // Pastikan ini diimport
+use Illuminate\Http\Request; // Pastikan ini diimport
+use Illuminate\Validation\Rule; // Pastikan ini diimport
+use Illuminate\Support\Facades\Storage; // Pastikan ini diimport
 use Illuminate\Support\Str;
 
-class PenilaianController extends Controller // Pastikan extends Controller
+class PenilaianController extends Controller
 {
     /**
      * Menampilkan daftar semua kasus yang berjenis PMP UMK untuk dinilai.
-     * (Method ini sepertinya tidak ada di versi sebelumnya, ditambahkan jika perlu)
      */
     public function indexPmpUmk(Request $request)
     {
@@ -34,19 +37,18 @@ class PenilaianController extends Controller // Pastikan extends Controller
         if ($kasus->jenis !== 'PMP_UMK') {
             return response()->json(['message' => 'Data tidak ditemukan.'], 404);
         }
-        
+
         // Memastikan relasi 'penanggung_jawab' dimuat bersama relasi lainnya
         return response()->json($kasus->load([
-            'pemegang', 
-            'penilaian', 
-            'tim.users', 
+            'pemegang',
+            'penilaian',
+            'tim.users',
             'penanggung_jawab' // Relasi koordinator
         ]));
     }
-    
+
     /**
      * Menjembatani data dari 'PermohonanPenilaian' ke 'Kasus'.
-     * (Method ini sepertinya tidak ada di versi sebelumnya, ditambahkan jika perlu)
      */
     public function initiatePenilaian(PermohonanPenilaian $permohonanPenilaian)
     {
@@ -55,17 +57,19 @@ class PenilaianController extends Controller // Pastikan extends Controller
             ['nomor_permohonan' => $permohonanPenilaian->nomor_permohonan],
             [
                 'jenis' => 'PMP_UMK',
-                // JANGAN ubah status permohonan di sini, biarkan apa adanya (bisa jadi 'Draft')
-                // 'status' => 'Menunggu Penilaian', // Baris ini sebaiknya disesuaikan
                 'pemegang_id' => $permohonanPenilaian->pemegang_id,
                 'tim_id' => $permohonanPenilaian->tim_id,
                 'penanggung_jawab_id' => $permohonanPenilaian->penanggung_jawab_id,
                 'prioritas_score' => $permohonanPenilaian->prioritas_score,
+                // Status kasus akan mengikuti status permohonan saat dibuat/diupdate
+                'status' => $permohonanPenilaian->status,
             ]
         );
          // Jika permohonan statusnya 'Baru', update jadi 'Menunggu Penilaian'
         if ($permohonanPenilaian->status == 'Baru') {
             $permohonanPenilaian->update(['status' => 'Menunggu Penilaian']);
+            // Update juga status kasus yang baru dibuat/diupdate
+            $kasus->update(['status' => 'Menunggu Penilaian']);
         }
 
         return response()->json(['kasus_id' => $kasus->id]);
@@ -73,10 +77,13 @@ class PenilaianController extends Controller // Pastikan extends Controller
 
     /**
      * Menyimpan hasil penilaian untuk sebuah kasus PMP UMK.
-     * (Kode lengkap method ini ada di versi sebelumnya, pastikan isinya benar)
      */
     public function storePenilaian(Request $request, Kasus $kasus)
     {
+        // --- TAMBAHKAN LOGGING DI SINI ---
+        Log::info('Received data for storePenilaian for Kasus ID: ' . $kasus->id, $request->all());
+        // --- AKHIR PENAMBAHAN LOGGING ---
+
         // Pastikan validasi dan logika penyimpanan ada di sini
         $isDeskStudyTidakSesuai = false;
         $deskStudies = $request->input('desk_study', []);
@@ -97,24 +104,39 @@ class PenilaianController extends Controller // Pastikan extends Controller
             'desk_study.*.hasil_kesesuaian' => 'required|string|in:Sesuai,Tidak Sesuai',
             'pengukuran' => 'nullable|array',
             'pengukuran.*.hasil_pengukuran' => 'nullable|numeric',
-            'pengukuran.*.keterangan' => ['nullable', 'string', Rule::in(["Sesuai", "Tidak sesuai", "Tidak Ada Ketentuan", "Belum Dapat Dinilai", "penilaian tidak dapat dilanjutkan"])],
+            // --- PERBAIKAN VALIDASI KETERANGAN (CASE INSENSITIVE) ---
+            // Terima "Tidak Sesuai" dan "Tidak sesuai"
+            'pengukuran.*.keterangan' => ['nullable', 'string', Rule::in([
+                "",
+                "Sesuai",
+                "Tidak Sesuai", // Terima S besar
+                "Tidak sesuai", // Terima s kecil
+                "Tidak Ada Ketentuan",
+                "Belum Dapat Dinilai",
+                "penilaian tidak dapat dilanjutkan"
+            ])],
+            // --- AKHIR PERBAIKAN ---
             'catatan' => 'nullable|string',
-            // Validasi untuk tanda tangan tim
             'tanda_tangan_tim' => 'nullable|array',
             'tanda_tangan_tim.*.user_id' => 'required|exists:users,id',
             'tanda_tangan_tim.*.signature' => 'required|string',
         ];
 
+        // Validasi kondisional untuk 'pemeriksaan'
         if (!$isDeskStudyTidakSesuai) {
             $rules['pemeriksaan'] = 'required|array';
             $rules['pemeriksaan.*.pernyataan_mandiri'] = 'required|string';
             $rules['pemeriksaan.*.hasil_pemeriksaan'] = 'required|string|in:Sesuai,Tidak Sesuai';
         } else {
             $rules['pemeriksaan'] = 'nullable|array';
+            // Jika tidak sesuai, pemeriksaan dan pengukuran tidak wajib diisi datanya tapi array-nya boleh ada
+            $rules['pemeriksaan.*.pernyataan_mandiri'] = 'nullable|string';
+            $rules['pemeriksaan.*.hasil_pemeriksaan'] = 'nullable|string|in:Sesuai,Tidak Sesuai';
         }
 
+
         $validatedData = $request->validate($rules);
-        
+
         $payload = [
             'desk_study' => $validatedData['desk_study'],
             'pemeriksaan' => $validatedData['pemeriksaan'] ?? null,
@@ -122,55 +144,91 @@ class PenilaianController extends Controller // Pastikan extends Controller
             'catatan' => $validatedData['catatan'] ?? null,
         ];
 
-        // Proses penyimpanan tanda tangan tim
-        $tandaTanganPaths = [];
-        if (!empty($validatedData['tanda_tangan_tim'])) {
-            foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
-                $path = $this->saveSignature($tandaTangan['signature'], 'ttd_penilai_' . $tandaTangan['user_id']);
-                $tandaTanganPaths[] = [
-                    'user_id' => $tandaTangan['user_id'],
-                    'signature_path' => $path
-                ];
+        // 4. Bungkus dalam Transaksi Database
+        try {
+            DB::beginTransaction();
+
+            // Proses penyimpanan tanda tangan tim
+            $tandaTanganPaths = [];
+            if (!empty($validatedData['tanda_tangan_tim'])) {
+                foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
+                    $path = $this->saveSignature($tandaTangan['signature'], 'ttd_penilai_' . $tandaTangan['user_id']);
+                    $tandaTanganPaths[] = [
+                        'user_id' => $tandaTangan['user_id'],
+                        'signature_path' => $path
+                    ];
+                }
             }
-        }
-        
-        $existingPenilaian = Penilaian::where('kasus_id', $kasus->id)->first();
-        $existingSignatures = $existingPenilaian->tanda_tangan_tim ?? [];
-        
-        $existingSigMap = collect($existingSignatures)->keyBy('user_id');
-        
-        foreach($tandaTanganPaths as $newSig) {
-            $existingSigMap[$newSig['user_id']] = $newSig;
-        }
 
-        $payload['tanda_tangan_tim'] = $existingSigMap->values()->all();
+            $existingPenilaian = Penilaian::where('kasus_id', $kasus->id)->first();
+            // 2. Null Check (gunakan operator nullsafe)
+            $existingSignatures = $existingPenilaian?->tanda_tangan_tim ?? [];
 
-        $penilaian = Penilaian::updateOrCreate(
-            ['kasus_id' => $kasus->id],
-            $payload
-        );
-        
-        // --- PERBAIKAN LOGIKA ---
-        // 1. Update status kasus (existing)
-        $kasus->update(['status' => 'Menunggu Verifikasi']);
-        
-        // 2. Update status permohonan terkait (NEW)
-        $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
-        if ($permohonan) {
-            // DIUBAH: Status diubah menjadi 'Menunggu Verifikasi' agar tidak muncul di tab 'pending'
-            $permohonan->update(['status' => 'Menunggu Verifikasi']);
+            $existingSigMap = collect($existingSignatures)->keyBy('user_id');
+
+            foreach ($tandaTanganPaths as $newSig) {
+                // Update atau tambahkan tanda tangan baru
+                $existingSigMap[$newSig['user_id']] = $newSig;
+            }
+
+            $payload['tanda_tangan_tim'] = $existingSigMap->values()->all();
+
+            $penilaian = Penilaian::updateOrCreate(
+                ['kasus_id' => $kasus->id],
+                $payload
+            );
+
+            // --- PERBAIKAN LOGIKA STATUS ---
+            // 6. Status Guard: Hanya update jika status belum final
+            // Definisikan status final agar mudah dikelola
+            $finalStatuses = [
+                'Menunggu Verifikasi',
+                'Penilaian Selesai - Patuh',
+                'Penilaian Selesai - Tidak Patuh',
+                'Proses Keberatan',
+                'Selesai',
+                'Penilaian Tidak Terlaksana' // Tambahkan ini jika relevan
+            ];
+
+            // Update status kasus jika belum final
+            if (!in_array($kasus->status, $finalStatuses)) {
+                $kasus->update(['status' => 'Menunggu Verifikasi']);
+            }
+
+            // Update status permohonan jika belum final
+            $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
+            if ($permohonan && !in_array($permohonan->status, $finalStatuses)) {
+                $permohonan->update(['status' => 'Menunggu Verifikasi']);
+            }
+            // --- AKHIR PERBAIKAN ---
+
+            DB::commit(); // Commit transaksi jika semua berhasil
+
+            return response()->json($penilaian, 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Tangani error validasi secara spesifik jika perlu
+            DB::rollBack();
+            // Kembalikan pesan error validasi yang lebih jelas
+            Log::warning("Validation failed during assessment save for Kasus ID {$kasus->id}: " . json_encode($e->errors()));
+            return response()->json(['message' => 'Data yang dikirim tidak valid. Periksa kembali isian formulir.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            DB::rollBack(); // Rollback jika ada error
+            Log::error("Error saving assessment for Kasus ID {$kasus->id}: " . $e->getMessage()); // Log error dengan detail
+            return response()->json(['message' => 'Gagal menyimpan penilaian. Terjadi kesalahan internal.'], 500);
         }
-        // --- AKHIR PERBAIKAN ---
-
-        return response()->json($penilaian, 201);
     }
 
     /**
-     * --- FITUR BARU: Menyimpan Draft Penilaian ---
+     * Menyimpan Draft Penilaian.
      */
     public function saveDraft(Request $request, Kasus $kasus)
     {
-        // 1. Validasi data draft (hanya desk_study dan catatan)
+        // --- TAMBAHKAN LOGGING DI SINI ---
+        Log::info('Received data for saveDraft for Kasus ID: ' . $kasus->id, $request->all());
+        // --- AKHIR PENAMBAHAN LOGGING ---
+
+        // 1. Validasi data draft (lebih longgar, hanya desk_study dan catatan)
         $validatedData = $request->validate([
             'desk_study' => 'nullable|array',
             'desk_study.*.pernyataan_mandiri_lokasi' => 'nullable|string',
@@ -179,30 +237,58 @@ class PenilaianController extends Controller // Pastikan extends Controller
             'desk_study.*.ketentuan_rtr_arahan' => 'nullable|string',
             'desk_study.*.hasil_kesesuaian' => 'nullable|string|in:Sesuai,Tidak Sesuai',
             'catatan' => 'nullable|string',
+            // Pemeriksaan dan Pengukuran tidak divalidasi ketat saat draft
+            'pemeriksaan' => 'nullable|array',
+            'pengukuran' => 'nullable|array',
         ]);
 
-        // 2. Siapkan data untuk disimpan
+        // 2. Siapkan data untuk disimpan (hanya field yang ada di validasi)
         $payload = [
             'desk_study' => $validatedData['desk_study'] ?? null,
             'catatan' => $validatedData['catatan'] ?? null,
-            // Biarkan 'pemeriksaan' dan 'pengukuran' apa adanya (jangan null)
+            // Simpan juga pemeriksaan dan pengukuran jika dikirim
+            'pemeriksaan' => $validatedData['pemeriksaan'] ?? null,
+            'pengukuran' => $validatedData['pengukuran'] ?? null,
         ];
 
-        // 3. Simpan atau perbarui data Penilaian (parsial)
-        $penilaian = Penilaian::updateOrCreate(
-            ['kasus_id' => $kasus->id],
-            $payload
-        );
+        try {
+            DB::beginTransaction();
 
-        // 4. Update status PermohonanPenilaian terkait menjadi 'Draft'
-        $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
-        if ($permohonan) {
-            $permohonan->update(['status' => 'Draft']);
+            // 3. Simpan atau perbarui data Penilaian (parsial)
+            $penilaian = Penilaian::updateOrCreate(
+                ['kasus_id' => $kasus->id],
+                $payload
+            );
+
+            // 4. Update status PermohonanPenilaian terkait menjadi 'Draft' HANYA JIKA BELUM FINAL
+            $permohonan = PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
+             $finalStatuses = [
+                'Menunggu Verifikasi',
+                'Penilaian Selesai - Patuh',
+                'Penilaian Selesai - Tidak Patuh',
+                'Proses Keberatan',
+                'Selesai',
+                'Penilaian Tidak Terlaksana'
+            ];
+            if ($permohonan && !in_array($permohonan->status, $finalStatuses)) {
+                $permohonan->update(['status' => 'Draft']);
+                // Update juga status kasus jika belum final
+                 if (!in_array($kasus->status, $finalStatuses)) {
+                    $kasus->update(['status' => 'Draft']);
+                }
+            }
+
+
+            DB::commit();
+
+            return response()->json($penilaian, 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error saving draft for Kasus ID {$kasus->id}: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal menyimpan draft. Terjadi kesalahan internal.'], 500);
         }
-
-        return response()->json($penilaian, 200);
     }
-    // --- AKHIR FITUR BARU ---
 
 
     /**
@@ -215,20 +301,29 @@ class PenilaianController extends Controller // Pastikan extends Controller
             $type = strtolower($type[1]);
 
             if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
-                throw new \Exception('invalid image type');
+                // Sebaiknya throw exception agar bisa ditangkap di try-catch utama
+                throw new \InvalidArgumentException('Tipe gambar tidak valid.');
             }
             $data = base64_decode($data);
 
             if ($data === false) {
-                throw new \Exception('base64_decode failed');
+                throw new \RuntimeException('Gagal melakukan decode base64.');
             }
         } else {
-            throw new \Exception('did not match data URI with image data');
+            throw new \InvalidArgumentException('Format data URI gambar tidak sesuai.');
         }
 
         $fileName = 'signatures/' . $prefix . '_' . Str::uuid() . '.' . $type;
-        // Pastikan disk 'public' terkonfigurasi dengan benar di config/filesystems.php
-        Storage::disk('public')->put($fileName, $data); 
+        // Gunakan try-catch untuk penanganan error I/O
+        try {
+            if (!Storage::disk('public')->put($fileName, $data)) {
+                 throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fileName}");
+            }
+        } catch (\Exception $e) {
+             Log::error("Error saving signature file {$fileName}: " . $e->getMessage());
+             throw $e; // Re-throw exception agar transaksi di rollback
+        }
         return $fileName; // Kembalikan path relatif
     }
 }
+
