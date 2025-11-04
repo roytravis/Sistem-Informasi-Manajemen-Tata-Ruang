@@ -14,6 +14,10 @@ use Illuminate\Http\Request; // Pastikan ini diimport
 use Illuminate\Validation\Rule; // Pastikan ini diimport
 use Illuminate\Support\Facades\Storage; // Pastikan ini diimport
 use Illuminate\Support\Str;
+// --- TAMBAHKAN IMPORTS BARU ---
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\File;
+// --- AKHIR IMPORTS ---
 
 class PenilaianController extends Controller
 {
@@ -81,7 +85,7 @@ class PenilaianController extends Controller
     public function storePenilaian(Request $request, Kasus $kasus)
     {
         // --- TAMBAHKAN LOGGING DI SINI ---
-        Log::info('Received data for storePenilaian for Kasus ID: ' . $kasus->id, $request->all());
+        Log::info('Received data for storePenilaian for Kasus ID: ' . $kasus->id, $request->except('tanda_tangan_tim'));
         // --- AKHIR PENAMBAHAN LOGGING ---
 
         // Pastikan validasi dan logika penyimpanan ada di sini
@@ -137,7 +141,7 @@ class PenilaianController extends Controller
 
         $validatedData = $request->validate($rules);
 
-        // --- PERBAIKAN: Payload dipisah agar logic merge TTD bekerja ---
+        // --- PERBAIKAN: Inisialisasi payload hanya dengan data formulir ---
         $payload = [
             'desk_study' => $validatedData['desk_study'],
             'pemeriksaan' => $validatedData['pemeriksaan'] ?? null,
@@ -173,9 +177,13 @@ class PenilaianController extends Controller
                 $existingSigMap[$newSig['user_id']] = $newSig;
             }
 
-            // --- PERBAIKAN: Tambahkan TTD ke payload setelah di-merge ---
+            // --- PERBAIKAN: Tambahkan tanda_tangan_tim ke payload SETELAH di-merge ---
             $payload['tanda_tangan_tim'] = $existingSigMap->values()->all();
             // --- AKHIR PERBAIKAN ---
+
+            // --- TAMBAHKAN LOGGING PAYLOAD ---
+            Log::info("Final payload being saved to DB for Kasus ID {$kasus->id}: ", $payload);
+            // --- AKHIR LOGGING PAYLOAD ---
 
             $penilaian = Penilaian::updateOrCreate(
                 ['kasus_id' => $kasus->id],
@@ -207,10 +215,6 @@ class PenilaianController extends Controller
             // --- AKHIR PERBAIKAN ---
 
             DB::commit(); // Commit transaksi jika semua berhasil
-            
-            // --- PENAMBAHAN LOGGING ---
-            Log::info('Final payload being saved to DB for Kasus ID ' . $kasus->id . ': ' . json_encode($payload));
-            // --- AKHIR PENAMBAHAN ---
 
             return response()->json($penilaian, 201);
 
@@ -233,7 +237,7 @@ class PenilaianController extends Controller
     public function saveDraft(Request $request, Kasus $kasus)
     {
         // --- TAMBAHKAN LOGGING DI SINI ---
-        Log::info('Received data for saveDraft for Kasus ID: ' . $kasus->id, $request->all());
+        Log::info('Received data for saveDraft for Kasus ID: ' . $kasus->id, $request->except('tanda_tangan_tim'));
         // --- AKHIR PENAMBAHAN LOGGING ---
 
         // --- PERBAIKAN: Validasi disamakan dengan storePenilaian tapi dibuat nullable ---
@@ -302,6 +306,9 @@ class PenilaianController extends Controller
             }
             // --- AKHIR PERBAIKAN TANDA TANGAN ---
 
+            // --- TAMBAHKAN LOGGING PAYLOAD ---
+            Log::info("Final payload being saved to DB for Kasus ID {$kasus->id}: ", $payload);
+            // --- AKHIR LOGGING PAYLOAD ---
 
             // 3. Simpan atau perbarui data Penilaian
             $penilaian = Penilaian::updateOrCreate(
@@ -329,10 +336,6 @@ class PenilaianController extends Controller
 
 
             DB::commit();
-            
-            // --- PENAMBAHAN LOGGING ---
-            Log::info('Final payload being saved to DB for Kasus ID ' . $kasus->id . ' (DRAFT): ' . json_encode($payload));
-            // --- AKHIR PENAMBAHAN ---
 
             return response()->json($penilaian, 200);
 
@@ -372,32 +375,37 @@ class PenilaianController extends Controller
             if (!Storage::disk('public')->put($fileName, $data)) {
                  throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fileName}");
             }
-            // --- PENAMBAHAN LOGGING ---
+            // --- TAMBAHKAN LOGGING SUKSES ---
             Log::info("Successfully saved signature file to: {$fileName}");
-            // --- AKHIR PENAMBAHAN ---
+            // --- AKHIR LOGGING ---
         } catch (\Exception $e) {
              Log::error("Error saving signature file {$fileName}: " . $e->getMessage());
              throw $e; // Re-throw exception agar transaksi di rollback
         }
         return $fileName; // Kembalikan path relatif
     }
-    
+
+    // --- FUNGSI BARU UNTUK MENGAMBIL GAMBAR ---
     /**
-     * PENAMBAHAN: Fungsi baru untuk mengambil file tanda tangan dengan aman.
-     * Ini menyelesaikan masalah symlink/CORS.
+     * Mengambil file gambar tanda tangan dari storage.
      */
     public function getSignatureImage($filename)
     {
-        // Mencegah path traversal, hanya izinkan nama file
-        $safeFilename = basename($filename);
-        $path = 'signatures/' . $safeFilename;
+        $path = 'signatures/' . $filename;
+        // Dapatkan path fisik lengkap ke file di dalam storage/app/public
+        $storagePath = Storage::disk('public')->path($path);
 
-        if (!Storage::disk('public')->exists($path)) {
-            abort(404, 'File tanda tangan tidak ditemukan.');
+        // Gunakan File::exists untuk mengecek path fisik
+        if (!File::exists($storagePath)) {
+            Log::warning("Signature file not found at path: {$storagePath}");
+            return response()->json(['message' => 'File tidak ditemukan.'], 404);
         }
 
-        return Storage::disk('public')->response($path);
+        Log::info("Serving signature file from path: {$storagePath}");
+
+        // response()->file() secara otomatis menangani header Content-Type dan Content-Length
+        return response()->file($storagePath);
     }
-    // --- AKHIR PENAMBAHAN ---
+    // --- AKHIR FUNGSI BARU ---
 }
 

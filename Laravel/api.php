@@ -17,6 +17,11 @@ use App\Http\Controllers\Api\BaPemeriksaanController; // <-- DITAMBAHKAN
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+// --- PENAMBAHAN: Rute untuk mengambil file tanda tangan ---
+// Rute ini harus di luar grup auth:sanctum agar tag <img> di browser bisa mengaksesnya
+Route::get('/signatures/{filename}', [PenilaianController::class, 'getSignatureImage']);
+// --- AKHIR PENAMBAHAN ---
+
 // Rute yang dilindungi (membutuhkan otentikasi)
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
@@ -98,9 +103,6 @@ Route::middleware('auth:sanctum')->group(function () {
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
     // --- AKHIR RUTE BERITA ACARA PEMERIKSAAN ---
 
-    // --- PENAMBAHAN: Rute untuk mengambil file tanda tangan ---
-    Route::get('/signatures/{filename}', [PenilaianController::class, 'getSignatureImage'])
-         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
-    // --- AKHIR PENAMBAHAN ---
+    // --- Rute tanda tangan DIPINDAHKAN dari sini ---
 });
 
