@@ -369,20 +369,28 @@ class PenilaianController extends Controller
             throw new \InvalidArgumentException('Format data URI gambar tidak sesuai.');
         }
 
-        $fileName = 'signatures/' . $prefix . '_' . Str::uuid() . '.' . $type;
+        // --- PERBAIKAN LOGIKA PENYIMPANAN ---
+        // 1. Buat nama file saja
+        $fileOnlyName = $prefix . '_' . Str::uuid() . '.' . $type;
+        // 2. Tentukan path lengkap untuk disimpan
+        $fullPath = 'signatures/' . $fileOnlyName;
+
         // Gunakan try-catch untuk penanganan error I/O
         try {
-            if (!Storage::disk('public')->put($fileName, $data)) {
-                 throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fileName}");
+            if (!Storage::disk('public')->put($fullPath, $data)) {
+                 throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fullPath}");
             }
             // --- TAMBAHKAN LOGGING SUKSES ---
-            Log::info("Successfully saved signature file to: {$fileName}");
+            Log::info("Successfully saved signature file to: {$fullPath}");
             // --- AKHIR LOGGING ---
         } catch (\Exception $e) {
-             Log::error("Error saving signature file {$fileName}: " . $e->getMessage());
+             Log::error("Error saving signature file {$fullPath}: " . $e->getMessage());
              throw $e; // Re-throw exception agar transaksi di rollback
         }
-        return $fileName; // Kembalikan path relatif
+        
+        // 3. Kembalikan HANYA nama filenya
+        return $fileOnlyName;
+        // --- AKHIR PERBAIKAN ---
     }
 
     // --- FUNGSI BARU UNTUK MENGAMBIL GAMBAR ---
@@ -408,4 +416,3 @@ class PenilaianController extends Controller
     }
     // --- AKHIR FUNGSI BARU ---
 }
-
