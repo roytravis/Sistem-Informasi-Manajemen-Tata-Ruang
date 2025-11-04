@@ -350,9 +350,11 @@ const PrintStyles = () => (
 
             /* Pengaturan layar (sebaliknya) */
             @media screen {
+                /*
                 .signature-image-container {
                     display: none;
                 }
+                */ /* <-- ATURAN INI DIHAPUS/DIKOMENTARI KARENA MENYEBABKAN TTD HILANG DI LAYAR */
                 .print-text-block {
                      display: none; /* Sembunyikan div alternatif di layar */
                  }
@@ -367,8 +369,10 @@ const PrintStyles = () => (
  * Ini diperlukan agar kita bisa memanggil `api.get` untuk URL gambar
  */
 const PetugasPenilai = ({ member, signaturePath, isReadOnly, signatureRef }) => {
-    // Gunakan URL absolut ke server Laravel Anda
-    const imageUrl = `http://127.0.0.1:8000/api/signatures/${signaturePath}?t=${new Date().getTime()}`;
+    // --- PERBAIKAN: Gunakan baseURL dari axios, jangan hardcode ---
+    const baseUrl = api.defaults.baseURL;
+    const imageUrl = `${baseUrl}/signatures/${signaturePath}?t=${new Date().getTime()}`;
+    // --- AKHIR PERBAIKAN ---
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 p-2 border rounded-md signature-block">
