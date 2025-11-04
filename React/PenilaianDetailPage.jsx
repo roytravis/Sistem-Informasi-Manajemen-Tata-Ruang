@@ -548,18 +548,43 @@ export default function PenilaianDetailPage() {
         return errors;
     };
 
-    // --- PENAMBAHAN: Fungsi untuk Save Draft ---
+    // --- FUNGSI UNTUK MENGAMBIL SEMUA DATA FORM (TERMASUK TTD) ---
+    const getFullFormData = () => {
+        // 1. Ambil semua data dari state
+        const data = { ...formData };
+
+        // 2. Ambil data tanda tangan
+        const signatureData = [];
+        petugasLapangan.forEach(member => {
+            const sigCanvas = signatureRefs.current[member.id];
+            const isCanvasEmpty = !sigCanvas || sigCanvas.isEmpty();
+
+            if (!isCanvasEmpty) {
+                // Jika canvas *tidak* kosong, ambil base64 baru
+                signatureData.push({
+                    user_id: member.id,
+                    signature: sigCanvas.toDataURL(),
+                });
+            }
+            // Jika canvas kosong, kita tidak mengirim apa-apa.
+            // Backend akan menggabungkannya dengan TTD yang sudah ada.
+            // Jika TTD yang sudah ada tidak ada, itu akan tetap kosong.
+        });
+
+        data.tanda_tangan_tim = signatureData;
+        return data;
+    };
+    // --- AKHIR FUNGSI BARU ---
+
+
+    // --- PERBAIKAN: Fungsi handleSaveDraft ---
     const handleSaveDraft = async () => {
         setDraftLoading(true);
         setError('');
         setValidationErrors({}); // Hapus error validasi, karena ini draft
 
-        // Hanya ambil data desk_study dan catatan
-        const draftData = {
-            desk_study: formData.desk_study,
-            catatan: formData.catatan
-            // Tidak perlu kirim 'pemeriksaan' atau 'pengukuran'
-        };
+        // Ambil *semua* data form, termasuk tanda tangan
+        const draftData = getFullFormData();
 
         try {
             // Panggil API draft baru
@@ -573,7 +598,7 @@ export default function PenilaianDetailPage() {
             setDraftLoading(false);
         }
     };
-    // --- AKHIR PENAMBAHAN ---
+    // --- AKHIR PERBAIKAN ---
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -588,32 +613,30 @@ export default function PenilaianDetailPage() {
             return;
         }
 
-        const signatureData = [];
+        // --- PERBAIKAN: Gunakan fungsi getFullFormData ---
+        const submissionData = getFullFormData();
+        // --- AKHIR PERBAIKAN ---
+
         let allMembersSigned = true;
+        const signatureMap = submissionData.tanda_tangan_tim.reduce((acc, sig) => {
+            acc[sig.user_id] = true;
+            return acc;
+        }, {});
 
         petugasLapangan.forEach(member => {
-            const sigCanvas = signatureRefs.current[member.id];
             const hasExistingSignature = !!signatures[member.id];
-            const isCanvasEmpty = !sigCanvas || sigCanvas.isEmpty();
+            const hasNewSignature = !!signatureMap[member.id];
 
-            if (!isCanvasEmpty) {
-                signatureData.push({
-                    user_id: member.id,
-                    signature: sigCanvas.toDataURL(),
-                });
-            } else if (!hasExistingSignature) {
+            if (!hasExistingSignature && !hasNewSignature) {
                 allMembersSigned = false;
             }
         });
 
-        if (petugasLapangan.length > 0 && !allMembersSigned && !initialPenilaianExists) {
-            setError('Semua Petugas Lapangan harus memberikan tanda tangan pada penilaian pertama.');
+        if (petugasLapangan.length > 0 && !allMembersSigned) {
+            setError('Semua Petugas Lapangan harus memberikan tanda tangan untuk submit final.');
             setSubmitLoading(false);
             return;
         }
-
-        const submissionData = { ...formData };
-        submissionData.tanda_tangan_tim = signatureData;
 
         if (isDeskStudyTidakSesuai) {
             submissionData.pemeriksaan = Array.from({ length: 8 }, () => ({ hasil_pemeriksaan: 'Sesuai' }));
