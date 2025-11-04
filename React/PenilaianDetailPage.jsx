@@ -7,7 +7,6 @@ import { useAuth } from '../context/AuthContext.jsx';
 // --- Komponen-komponen Reusable ---
 
 const DeskStudyRow = ({ index, data, onChange, errors, isReadOnly }) => {
-// ... (Kode komponen DeskStudyRow tidak berubah) ...
     const hasError = (field) => errors && errors[`desk_study.${index}.${field}`];
     const disabledClasses = isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300';
     // Mengambil nilai untuk ditampilkan di div alternatif
@@ -102,7 +101,6 @@ const DeskStudyRow = ({ index, data, onChange, errors, isReadOnly }) => {
 };
 
 const PemeriksaanRow = ({ no, komponen, subKomponen, data, index, onChange, errors, isReadOnly }) => {
-// ... (Kode komponen PemeriksaanRow tidak berubah) ...
     const hasError = (field) => errors && errors[`pemeriksaan.${index}.${field}`];
     const disabledClasses = isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300';
 
@@ -148,7 +146,6 @@ const PemeriksaanRow = ({ no, komponen, subKomponen, data, index, onChange, erro
 };
 
 const PengukuranRow = ({ no, main, sub, unit, data, index, onChange, isReadOnly }) => {
-// ... (Kode komponen PengukuranRow tidak berubah) ...
     const keteranganOptions = [
         "Sesuai",
         "Tidak sesuai",
@@ -214,7 +211,6 @@ const PengukuranRow = ({ no, main, sub, unit, data, index, onChange, isReadOnly 
 
 // Komponen PrintStyles diperbarui
 const PrintStyles = () => (
-// ... (Kode PrintStyles tidak berubah) ...
     <style>
         {`
             /* Pengaturan Margin Halaman Cetak (Mirip F4) */
@@ -365,6 +361,56 @@ const PrintStyles = () => (
     </style>
 );
 
+// --- PERBAIKAN: Komponen Tanda Tangan ---
+/**
+ * Komponen terpisah untuk menampilkan Petugas Penilai dan Tanda Tangan
+ * Ini diperlukan agar kita bisa memanggil `api.get` untuk URL gambar
+ */
+const PetugasPenilai = ({ member, signaturePath, isReadOnly, signatureRef }) => {
+    // Gunakan URL absolut ke server Laravel Anda
+    const imageUrl = `http://127.0.0.1:8000/api/signatures/${signaturePath}?t=${new Date().getTime()}`;
+
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 p-2 border rounded-md signature-block">
+            {/* Info Petugas */}
+            <div>
+                <label className="block text-xs font-medium text-gray-700 font-semibold">Nama Petugas</label>
+                <p className="mt-0.5 p-1 border rounded-md bg-gray-50 text-sm">{member.nama}</p>
+                <label className="block text-xs font-medium text-gray-700 font-semibold mt-0.5">NIP/NIK</label>
+                <p className="mt-0.5 p-1 border rounded-md bg-gray-50 text-sm">{member.nip || 'Tidak tersedia'}</p>
+                <label className="block text-xs font-medium text-gray-700 font-semibold mt-0.5">Jabatan</label>
+                <p className="mt-0.5 p-1 border rounded-md bg-gray-50 text-sm">{member.pivot?.jabatan_di_tim || member.role}</p>
+            </div>
+            {/* Tanda Tangan */}
+            <div>
+                <label className="block text-xs font-medium text-gray-700 font-semibold">Tanda Tangan:</label>
+                {/* 1. Tampilan Gambar (untuk Print dan ReadOnly) */}
+                <div className="my-0.5 signature-image-container">
+                    {signaturePath ? (
+                        <img 
+                            src={imageUrl} 
+                            alt={`Tanda Tangan ${member.nama}`} 
+                            className="mx-auto h-16 border rounded bg-white"
+                        />
+                    ) : (
+                        <div className="h-16 border rounded bg-white flex items-center justify-center text-gray-400 text-xs">(Belum TTD)</div>
+                    )}
+                </div>
+                {/* 2. Canvas Tanda Tangan (Hanya saat mode Edit) */}
+                {!isReadOnly && (
+                    <div className='signature-canvas-container'>
+                        <div className="border border-gray-300 rounded-md bg-white">
+                            <SignatureCanvas ref={signatureRef} penColor='black' canvasProps={{className: 'w-full h-20'}} />
+                        </div>
+                        <button type="button" onClick={() => signatureRef?.clear()} className="text-xs text-blue-600 hover:underline mt-0.5 no-print">Ulangi</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+// --- AKHIR PERBAIKAN ---
+
 
 export default function PenilaianDetailPage() {
     const { id } = useParams();
@@ -394,23 +440,21 @@ export default function PenilaianDetailPage() {
         return formData.desk_study.some(item => item.hasil_kesesuaian === 'Tidak Sesuai');
     }, [formData.desk_study]);
 
-    // --- PERBAIKAN: Logika dikembalikan sesuai permintaan ---
     const petugasLapangan = useMemo(() => {
         if (!kasus || !kasus.tim || !kasus.tim.users) {
             return [];
         }
-        // Hanya ambil anggota dengan jabatan tim "Petugas Lapangan"
+        // --- PERBAIKAN: Kembali ke logika filter 'Petugas Lapangan' ---
         return kasus.tim.users.filter(
             member => member.pivot?.jabatan_di_tim === 'Petugas Lapangan'
         );
+        // --- AKHIR PERBAIKAN ---
     }, [kasus]);
-    // --- AKHIR PERBAIKAN ---
 
     const isPemeriksaanDisabled = isReadOnly || isDeskStudyTidakSesuai;
     const isPengukuranDisabled = isReadOnly || isDeskStudyTidakSesuai;
 
      const pemeriksaanStruktur = [
-// ... (Kode pemeriksaanStruktur tidak berubah) ...
         { no: '1', komponen: { label: 'Lokasi Usaha', rowSpan: 7 }, subKomponen: 'Alamat' },
         { subKomponen: 'Desa/Kelurahan' },
         { subKomponen: 'Kecamatan' },
@@ -421,7 +465,6 @@ export default function PenilaianDetailPage() {
         { no: '2', komponen: { label: 'Kegiatan Pemanfaatan Ruang', rowSpan: 1 }, subKomponen: 'Jenis' },
      ];
     const pengukuranStruktur = [
-// ... (Kode pengukuranStruktur tidak berubah) ...
         { no: '1', main: { label: 'Luas Tanah', rowSpan: 2 }, sub: 'Luas Tanah yang digunakan kegiatan Pemanfaatan Ruang', unit: 'm&sup2;' },
         { sub: 'Luas Tanah yang dikuasai', unit: 'm&sup2;' },
         { no: '2', main: { label: 'KDB', rowSpan: 1 }, sub: 'Luas Lantai Dasar Bangunan', unit: 'm&sup2;' },
@@ -448,7 +491,7 @@ export default function PenilaianDetailPage() {
             const kegiatan = pemegang?.kegiatan || '';
 
             if (kasusData.penilaian) {
-                // --- PERUBAHAN: Cek status permohonan ---
+                // --- PERBAIKAN: Cek status permohonan ---
                 // Jika status 'Draft', JANGAN set isReadOnly
                 // (Kita asumsikan status kasus sudah mencerminkan ini)
                 if (kasusData.status === 'Draft') {
@@ -461,7 +504,7 @@ export default function PenilaianDetailPage() {
                     // Status lain (Menunggu Verifikasi, Selesai, dll) -> Read Only
                     setIsReadOnly(true); 
                 }
-                // --- AKHIR PERUBAHAN ---
+                // --- AKHIR PERBAIKAN ---
 
                 setInitialPenilaianExists(true);
 
@@ -500,14 +543,14 @@ export default function PenilaianDetailPage() {
                 });
 
                 if (kasusData.penilaian.tanda_tangan_tim) {
+                    // --- PERBAIKAN: Simpan path, bukan URL ---
                     const sigs = kasusData.penilaian.tanda_tangan_tim.reduce((acc, curr) => {
-                        // --- PERBAIKAN: Gunakan signature_path ---
-                        // Backend mengirimkan path relatif, cth: "signatures/ttd_penilai_121_...png"
+                        // Kita simpan 'signature_path' (nama file)
                         acc[curr.user_id] = curr.signature_path; 
-                        // --- AKHIR PERBAIKAN ---
                         return acc;
                     }, {});
                     setSignatures(sigs);
+                    // --- AKHIR PERBAIKAN ---
                 }
             } else {
                  setIsReadOnly(false); // Form baru, bisa diedit
@@ -535,7 +578,6 @@ export default function PenilaianDetailPage() {
     }, [id, user]);
 
     const handleChange = (e) => {
-// ... (Kode handleChange tidak berubah) ...
         const { name, value } = e.target;
         const [section, index, field] = name.split('.');
 
@@ -547,7 +589,6 @@ export default function PenilaianDetailPage() {
     };
 
     const validateForm = () => {
-// ... (Kode validateForm tidak berubah) ...
         const errors = {};
         formData.desk_study.forEach((item, index) => {
             if (!item.pernyataan_mandiri_lokasi?.trim()) errors[`desk_study.${index}.pernyataan_mandiri_lokasi`] = true;
@@ -567,7 +608,6 @@ export default function PenilaianDetailPage() {
 
     // --- FUNGSI UNTUK MENGAMBIL SEMUA DATA FORM (TERMASUK TTD) ---
     const getFullFormData = () => {
-// ... (Kode getFullFormData tidak berubah) ...
         // 1. Ambil semua data dari state
         const data = { ...formData };
 
@@ -597,7 +637,6 @@ export default function PenilaianDetailPage() {
 
     // --- PERBAIKAN: Fungsi handleSaveDraft ---
     const handleSaveDraft = async () => {
-// ... (Kode handleSaveDraft tidak berubah) ...
         setDraftLoading(true);
         setError('');
         setValidationErrors({}); // Hapus error validasi, karena ini draft
@@ -620,7 +659,6 @@ export default function PenilaianDetailPage() {
     // --- AKHIR PERBAIKAN ---
 
     const handleSubmit = async (e) => {
-// ... (Kode handleSubmit tidak berubah) ...
         e.preventDefault();
         if (isReadOnly) return;
 
@@ -665,7 +703,10 @@ export default function PenilaianDetailPage() {
 
         setSubmitLoading(true);
         try {
+            // --- PERBAIKAN: Gunakan getFullFormData untuk submit final juga ---
             await api.post(`/penilaian/pmp-umk/${id}`, submissionData);
+            // --- AKHIR PERBAIKAN ---
+            
             alert(initialPenilaianExists ? 'Perubahan berhasil disimpan!' : 'Penilaian berhasil disimpan!');
             setIsReadOnly(true);
             fetchDetail(); // Re-fetch data
@@ -679,7 +720,6 @@ export default function PenilaianDetailPage() {
     };
 
     const handlePrint = () => {
-// ... (Kode handlePrint tidak berubah) ...
         window.print();
     };
 
@@ -848,40 +888,15 @@ export default function PenilaianDetailPage() {
                         <div className="space-y-2"> {/* Kurangi space-y */}
                             {petugasLapangan.length > 0 ? (
                                 petugasLapangan.map(member => (
-                                    <div key={member.id} className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 p-2 border rounded-md signature-block"> {/* Kurangi gap-x, gap-y, p */}
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 font-semibold">Nama Petugas</label>
-                                            <p className="mt-0.5 p-1 border rounded-md bg-gray-50 text-sm">{member.nama}</p> {/* mt-0.5 */}
-                                            <label className="block text-xs font-medium text-gray-700 font-semibold mt-0.5">NIP/NIK</label> {/* mt-0.5 */}
-                                            <p className="mt-0.5 p-1 border rounded-md bg-gray-50 text-sm">{member.nip || 'Tidak tersedia'}</p> {/* mt-0.5 */}
-                                            <label className="block text-xs font-medium text-gray-700 font-semibold mt-0.5">Jabatan</label> {/* mt-0.5 */}
-                                            <p className="mt-0.5 p-1 border rounded-md bg-gray-50 text-sm">{member.pivot?.jabatan_di_tim || member.role}</p> {/* mt-0.5 */}
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 font-semibold">Tanda Tangan:</label>
-                                            {/* --- PERBAIKAN: Gunakan rute API baru dan cache-buster --- */}
-                                            <div className="my-0.5 signature-image-container"> {/* my-0.5 */}
-                                                {signatures[member.id] ? (
-                                                    <img 
-                                                        src={`${api.defaults.baseURL}/signatures/${signatures[member.id].split('/').pop()}?t=${new Date().getTime()}`} 
-                                                        alt={`Tanda Tangan ${member.nama}`} 
-                                                        className="mx-auto h-16 border rounded bg-white"
-                                                    /> /* h-16 */
-                                                ) : (
-                                                    <div className="h-16 border rounded bg-white flex items-center justify-center text-gray-400 text-xs">(Belum TTD)</div> /* h-16 */
-                                                )}
-                                            </div>
-                                            {/* --- AKHIR PERBAIKAN --- */}
-                                            {!isReadOnly && (
-                                                <div className='signature-canvas-container'>
-                                                    <div className="border border-gray-300 rounded-md bg-white">
-                                                        <SignatureCanvas ref={el => signatureRefs.current[member.id] = el} penColor='black' canvasProps={{className: 'w-full h-20'}} /> {/* h-20 */}
-                                                    </div>
-                                                    <button type="button" onClick={() => signatureRefs.current[member.id]?.clear()} className="text-xs text-blue-600 hover:underline mt-0.5 no-print">Ulangi</button> {/* mt-0.5 */}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    // --- PERBAIKAN: Gunakan Komponen TTD ---
+                                    <PetugasPenilai
+                                        key={member.id}
+                                        member={member}
+                                        signaturePath={signatures[member.id]}
+                                        isReadOnly={isReadOnly}
+                                        signatureRef={el => signatureRefs.current[member.id] = el}
+                                    />
+                                    // --- AKHIR PERBAIKAN ---
                                 ))
                             ) : (
                                 <p className="text-gray-500 text-sm">Tidak ada 'Petugas Lapangan' yang ditugaskan ke tim ini.</p>
