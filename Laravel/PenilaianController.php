@@ -228,7 +228,7 @@ class PenilaianController extends Controller
         Log::info('Received data for saveDraft for Kasus ID: ' . $kasus->id, $request->all());
         // --- AKHIR PENAMBAHAN LOGGING ---
 
-        // 1. Validasi data draft (lebih longgar, hanya desk_study dan catatan)
+        // --- PERBAIKAN: Validasi disamakan dengan storePenilaian tapi dibuat nullable ---
         $validatedData = $request->validate([
             'desk_study' => 'nullable|array',
             'desk_study.*.pernyataan_mandiri_lokasi' => 'nullable|string',
@@ -237,24 +237,65 @@ class PenilaianController extends Controller
             'desk_study.*.ketentuan_rtr_arahan' => 'nullable|string',
             'desk_study.*.hasil_kesesuaian' => 'nullable|string|in:Sesuai,Tidak Sesuai',
             'catatan' => 'nullable|string',
-            // Pemeriksaan dan Pengukuran tidak divalidasi ketat saat draft
             'pemeriksaan' => 'nullable|array',
             'pengukuran' => 'nullable|array',
+            // Tambahkan validasi untuk tanda tangan (nullable)
+            'tanda_tangan_tim' => 'nullable|array',
+            'tanda_tangan_tim.*.user_id' => 'required_with:tanda_tangan_tim|exists:users,id',
+            'tanda_tangan_tim.*.signature' => 'required_with:tanda_tangan_tim|string',
         ]);
+        // --- AKHIR PERBAIKAN VALIDASI ---
 
-        // 2. Siapkan data untuk disimpan (hanya field yang ada di validasi)
+        // --- PERBAIKAN: Payload menyertakan semua field ---
         $payload = [
             'desk_study' => $validatedData['desk_study'] ?? null,
             'catatan' => $validatedData['catatan'] ?? null,
-            // Simpan juga pemeriksaan dan pengukuran jika dikirim
             'pemeriksaan' => $validatedData['pemeriksaan'] ?? null,
             'pengukuran' => $validatedData['pengukuran'] ?? null,
         ];
+        // --- AKHIR PERBAIKAN PAYLOAD ---
 
         try {
             DB::beginTransaction();
 
-            // 3. Simpan atau perbarui data Penilaian (parsial)
+            // --- PERBAIKAN: Tambahkan logika penyimpanan tanda tangan (sama seperti storePenilaian) ---
+            $tandaTanganPaths = [];
+            if (!empty($validatedData['tanda_tangan_tim'])) {
+                foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
+                    // Hanya proses jika ada data signature (frontend mungkin kirim array kosong)
+                    if (!empty($tandaTangan['signature'])) {
+                        $path = $this->saveSignature($tandaTangan['signature'], 'ttd_penilai_' . $tandaTangan['user_id']);
+                        $tandaTanganPaths[] = [
+                            'user_id' => $tandaTangan['user_id'],
+                            'signature_path' => $path
+                        ];
+                    }
+                }
+            }
+
+            $existingPenilaian = Penilaian::where('kasus_id', $kasus->id)->first();
+            $existingSignatures = $existingPenilaian?->tanda_tangan_tim ?? [];
+            $existingSigMap = collect($existingSignatures)->keyBy('user_id');
+
+            foreach ($tandaTanganPaths as $newSig) {
+                // Update atau tambahkan tanda tangan baru
+                $existingSigMap[$newSig['user_id']] = $newSig;
+            }
+
+            // Hanya tambahkan ke payload jika ada data signature baru atau lama
+            if ($existingSigMap->isNotEmpty()) {
+                $payload['tanda_tangan_tim'] = $existingSigMap->values()->all();
+            } else if (empty($validatedData['tanda_tangan_tim'])) {
+                // Jika frontend mengirim array kosong (misal, setelah clear),
+                // kita biarkan $payload['tanda_tangan_tim'] tidak diset,
+                // sehingga updateOrCreate tidak akan menimpanya.
+                // Jika kita ingin *menghapus* ttd, kita harus set $payload['tanda_tangan_tim'] = [];
+                // Untuk draft, lebih aman untuk *tidak* menghapus, hanya menambah/update.
+            }
+            // --- AKHIR PERBAIKAN TANDA TANGAN ---
+
+
+            // 3. Simpan atau perbarui data Penilaian
             $penilaian = Penilaian::updateOrCreate(
                 ['kasus_id' => $kasus->id],
                 $payload
@@ -326,4 +367,3 @@ class PenilaianController extends Controller
         return $fileName; // Kembalikan path relatif
     }
 }
-
