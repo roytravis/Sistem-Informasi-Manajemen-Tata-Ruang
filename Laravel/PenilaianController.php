@@ -137,12 +137,14 @@ class PenilaianController extends Controller
 
         $validatedData = $request->validate($rules);
 
+        // --- PERBAIKAN: Payload dipisah agar logic merge TTD bekerja ---
         $payload = [
             'desk_study' => $validatedData['desk_study'],
             'pemeriksaan' => $validatedData['pemeriksaan'] ?? null,
             'pengukuran' => $validatedData['pengukuran'] ?? null,
             'catatan' => $validatedData['catatan'] ?? null,
         ];
+        // --- AKHIR PERBAIKAN ---
 
         // 4. Bungkus dalam Transaksi Database
         try {
@@ -171,7 +173,9 @@ class PenilaianController extends Controller
                 $existingSigMap[$newSig['user_id']] = $newSig;
             }
 
+            // --- PERBAIKAN: Tambahkan TTD ke payload setelah di-merge ---
             $payload['tanda_tangan_tim'] = $existingSigMap->values()->all();
+            // --- AKHIR PERBAIKAN ---
 
             $penilaian = Penilaian::updateOrCreate(
                 ['kasus_id' => $kasus->id],
@@ -203,6 +207,10 @@ class PenilaianController extends Controller
             // --- AKHIR PERBAIKAN ---
 
             DB::commit(); // Commit transaksi jika semua berhasil
+            
+            // --- PENAMBAHAN LOGGING ---
+            Log::info('Final payload being saved to DB for Kasus ID ' . $kasus->id . ': ' . json_encode($payload));
+            // --- AKHIR PENAMBAHAN ---
 
             return response()->json($penilaian, 201);
 
@@ -321,6 +329,10 @@ class PenilaianController extends Controller
 
 
             DB::commit();
+            
+            // --- PENAMBAHAN LOGGING ---
+            Log::info('Final payload being saved to DB for Kasus ID ' . $kasus->id . ' (DRAFT): ' . json_encode($payload));
+            // --- AKHIR PENAMBAHAN ---
 
             return response()->json($penilaian, 200);
 
@@ -360,10 +372,32 @@ class PenilaianController extends Controller
             if (!Storage::disk('public')->put($fileName, $data)) {
                  throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fileName}");
             }
+            // --- PENAMBAHAN LOGGING ---
+            Log::info("Successfully saved signature file to: {$fileName}");
+            // --- AKHIR PENAMBAHAN ---
         } catch (\Exception $e) {
              Log::error("Error saving signature file {$fileName}: " . $e->getMessage());
              throw $e; // Re-throw exception agar transaksi di rollback
         }
         return $fileName; // Kembalikan path relatif
     }
+    
+    /**
+     * PENAMBAHAN: Fungsi baru untuk mengambil file tanda tangan dengan aman.
+     * Ini menyelesaikan masalah symlink/CORS.
+     */
+    public function getSignatureImage($filename)
+    {
+        // Mencegah path traversal, hanya izinkan nama file
+        $safeFilename = basename($filename);
+        $path = 'signatures/' . $safeFilename;
+
+        if (!Storage::disk('public')->exists($path)) {
+            abort(404, 'File tanda tangan tidak ditemukan.');
+        }
+
+        return Storage::disk('public')->response($path);
+    }
+    // --- AKHIR PENAMBAHAN ---
 }
+

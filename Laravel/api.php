@@ -97,4 +97,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/ba-pemeriksaan/{penilaian}', [BaPemeriksaanController::class, 'show'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
     // --- AKHIR RUTE BERITA ACARA PEMERIKSAAN ---
+
+    // --- PENAMBAHAN: Rute untuk mengambil file tanda tangan ---
+    Route::get('/signatures/{filename}', [PenilaianController::class, 'getSignatureImage'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+    // --- AKHIR PENAMBAHAN ---
 });
+
