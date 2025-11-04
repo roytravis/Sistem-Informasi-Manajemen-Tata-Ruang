@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 // --- Komponen-komponen Reusable ---
 
 const DeskStudyRow = ({ index, data, onChange, errors, isReadOnly }) => {
+// ... (Kode komponen DeskStudyRow tidak berubah) ...
     const hasError = (field) => errors && errors[`desk_study.${index}.${field}`];
     const disabledClasses = isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300';
     // Mengambil nilai untuk ditampilkan di div alternatif
@@ -101,6 +102,7 @@ const DeskStudyRow = ({ index, data, onChange, errors, isReadOnly }) => {
 };
 
 const PemeriksaanRow = ({ no, komponen, subKomponen, data, index, onChange, errors, isReadOnly }) => {
+// ... (Kode komponen PemeriksaanRow tidak berubah) ...
     const hasError = (field) => errors && errors[`pemeriksaan.${index}.${field}`];
     const disabledClasses = isReadOnly ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300';
 
@@ -146,6 +148,7 @@ const PemeriksaanRow = ({ no, komponen, subKomponen, data, index, onChange, erro
 };
 
 const PengukuranRow = ({ no, main, sub, unit, data, index, onChange, isReadOnly }) => {
+// ... (Kode komponen PengukuranRow tidak berubah) ...
     const keteranganOptions = [
         "Sesuai",
         "Tidak sesuai",
@@ -211,6 +214,7 @@ const PengukuranRow = ({ no, main, sub, unit, data, index, onChange, isReadOnly 
 
 // Komponen PrintStyles diperbarui
 const PrintStyles = () => (
+// ... (Kode PrintStyles tidak berubah) ...
     <style>
         {`
             /* Pengaturan Margin Halaman Cetak (Mirip F4) */
@@ -390,19 +394,23 @@ export default function PenilaianDetailPage() {
         return formData.desk_study.some(item => item.hasil_kesesuaian === 'Tidak Sesuai');
     }, [formData.desk_study]);
 
+    // --- PERBAIKAN: Logika dikembalikan sesuai permintaan ---
     const petugasLapangan = useMemo(() => {
         if (!kasus || !kasus.tim || !kasus.tim.users) {
             return [];
         }
+        // Hanya ambil anggota dengan jabatan tim "Petugas Lapangan"
         return kasus.tim.users.filter(
             member => member.pivot?.jabatan_di_tim === 'Petugas Lapangan'
         );
     }, [kasus]);
+    // --- AKHIR PERBAIKAN ---
 
     const isPemeriksaanDisabled = isReadOnly || isDeskStudyTidakSesuai;
     const isPengukuranDisabled = isReadOnly || isDeskStudyTidakSesuai;
 
      const pemeriksaanStruktur = [
+// ... (Kode pemeriksaanStruktur tidak berubah) ...
         { no: '1', komponen: { label: 'Lokasi Usaha', rowSpan: 7 }, subKomponen: 'Alamat' },
         { subKomponen: 'Desa/Kelurahan' },
         { subKomponen: 'Kecamatan' },
@@ -413,6 +421,7 @@ export default function PenilaianDetailPage() {
         { no: '2', komponen: { label: 'Kegiatan Pemanfaatan Ruang', rowSpan: 1 }, subKomponen: 'Jenis' },
      ];
     const pengukuranStruktur = [
+// ... (Kode pengukuranStruktur tidak berubah) ...
         { no: '1', main: { label: 'Luas Tanah', rowSpan: 2 }, sub: 'Luas Tanah yang digunakan kegiatan Pemanfaatan Ruang', unit: 'm&sup2;' },
         { sub: 'Luas Tanah yang dikuasai', unit: 'm&sup2;' },
         { no: '2', main: { label: 'KDB', rowSpan: 1 }, sub: 'Luas Lantai Dasar Bangunan', unit: 'm&sup2;' },
@@ -441,13 +450,16 @@ export default function PenilaianDetailPage() {
             if (kasusData.penilaian) {
                 // --- PERUBAHAN: Cek status permohonan ---
                 // Jika status 'Draft', JANGAN set isReadOnly
-                const permohonanRes = await api.get('/permohonan-penilaian'); // Ini kurang ideal, lebih baik jika API kasus mengembalikan status permohonan
-                const permohonanTerkait = permohonanRes.data.data.find(p => p.nomor_permohonan === kasusData.nomor_permohonan);
-
-                if (permohonanTerkait && permohonanTerkait.status === 'Draft') {
+                // (Kita asumsikan status kasus sudah mencerminkan ini)
+                if (kasusData.status === 'Draft') {
                     setIsReadOnly(false);
+                } else if (kasusData.status === 'Baru' || kasusData.status === 'Menunggu Penilaian') {
+                    // Jika status 'Baru' atau 'Menunggu Penilaian' (meski sudah ada data),
+                    // biarkan bisa diedit, karena 'Menunggu Penilaian' adalah status inisial.
+                    setIsReadOnly(false); 
                 } else {
-                    setIsReadOnly(true);
+                    // Status lain (Menunggu Verifikasi, Selesai, dll) -> Read Only
+                    setIsReadOnly(true); 
                 }
                 // --- AKHIR PERUBAHAN ---
 
@@ -489,7 +501,10 @@ export default function PenilaianDetailPage() {
 
                 if (kasusData.penilaian.tanda_tangan_tim) {
                     const sigs = kasusData.penilaian.tanda_tangan_tim.reduce((acc, curr) => {
-                        acc[curr.user_id] = curr.signature_path;
+                        // --- PERBAIKAN: Gunakan signature_path ---
+                        // Backend mengirimkan path relatif, cth: "signatures/ttd_penilai_121_...png"
+                        acc[curr.user_id] = curr.signature_path; 
+                        // --- AKHIR PERBAIKAN ---
                         return acc;
                     }, {});
                     setSignatures(sigs);
@@ -520,6 +535,7 @@ export default function PenilaianDetailPage() {
     }, [id, user]);
 
     const handleChange = (e) => {
+// ... (Kode handleChange tidak berubah) ...
         const { name, value } = e.target;
         const [section, index, field] = name.split('.');
 
@@ -531,6 +547,7 @@ export default function PenilaianDetailPage() {
     };
 
     const validateForm = () => {
+// ... (Kode validateForm tidak berubah) ...
         const errors = {};
         formData.desk_study.forEach((item, index) => {
             if (!item.pernyataan_mandiri_lokasi?.trim()) errors[`desk_study.${index}.pernyataan_mandiri_lokasi`] = true;
@@ -550,6 +567,7 @@ export default function PenilaianDetailPage() {
 
     // --- FUNGSI UNTUK MENGAMBIL SEMUA DATA FORM (TERMASUK TTD) ---
     const getFullFormData = () => {
+// ... (Kode getFullFormData tidak berubah) ...
         // 1. Ambil semua data dari state
         const data = { ...formData };
 
@@ -579,6 +597,7 @@ export default function PenilaianDetailPage() {
 
     // --- PERBAIKAN: Fungsi handleSaveDraft ---
     const handleSaveDraft = async () => {
+// ... (Kode handleSaveDraft tidak berubah) ...
         setDraftLoading(true);
         setError('');
         setValidationErrors({}); // Hapus error validasi, karena ini draft
@@ -601,6 +620,7 @@ export default function PenilaianDetailPage() {
     // --- AKHIR PERBAIKAN ---
 
     const handleSubmit = async (e) => {
+// ... (Kode handleSubmit tidak berubah) ...
         e.preventDefault();
         if (isReadOnly) return;
 
@@ -659,6 +679,7 @@ export default function PenilaianDetailPage() {
     };
 
     const handlePrint = () => {
+// ... (Kode handlePrint tidak berubah) ...
         window.print();
     };
 
@@ -838,13 +859,19 @@ export default function PenilaianDetailPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-medium text-gray-700 font-semibold">Tanda Tangan:</label>
+                                            {/* --- PERBAIKAN: Gunakan rute API baru dan cache-buster --- */}
                                             <div className="my-0.5 signature-image-container"> {/* my-0.5 */}
                                                 {signatures[member.id] ? (
-                                                    <img src={`http://127.0.0.1:8000/storage/${signatures[member.id]}`} alt={`Tanda Tangan ${member.nama}`} className="mx-auto h-16 border rounded bg-white"/> /* h-16 */
+                                                    <img 
+                                                        src={`${api.defaults.baseURL}/signatures/${signatures[member.id].split('/').pop()}?t=${new Date().getTime()}`} 
+                                                        alt={`Tanda Tangan ${member.nama}`} 
+                                                        className="mx-auto h-16 border rounded bg-white"
+                                                    /> /* h-16 */
                                                 ) : (
                                                     <div className="h-16 border rounded bg-white flex items-center justify-center text-gray-400 text-xs">(Belum TTD)</div> /* h-16 */
                                                 )}
                                             </div>
+                                            {/* --- AKHIR PERBAIKAN --- */}
                                             {!isReadOnly && (
                                                 <div className='signature-canvas-container'>
                                                     <div className="border border-gray-300 rounded-md bg-white">
@@ -889,3 +916,4 @@ export default function PenilaianDetailPage() {
         </div>
     );
 }
+
