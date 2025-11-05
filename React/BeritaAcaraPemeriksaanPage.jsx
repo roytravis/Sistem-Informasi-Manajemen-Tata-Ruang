@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'; // Tambahkan useRef
 import { useParams, Link } from 'react-router-dom';
-import api from '../api/axios';
+import api from '../api/axios'; // <-- PERBAIKAN 1: Import api
 import SignatureCanvas from 'react-signature-canvas'; // Import SignatureCanvas
 
 /**
@@ -237,8 +237,12 @@ export default function BeritaAcaraPemeriksaanPage() {
 
         // Koordinator diambil dari kasus (sudah dimuat API)
         const koordinator = penanggung_jawab; 
-        // Petugas lapangan = anggota tim BUKAN koordinator
-        const petugasLapangan = tim?.users?.filter(u => u.id !== koordinator?.id) || []; 
+        
+        // --- PERBAIKAN 2: Filter anggota tim ---
+        // Ambil HANYA 'Petugas Lapangan'
+        const petugasLapangan = tim?.users?.filter(u => u.pivot?.jabatan_di_tim === 'Petugas Lapangan') || []; 
+        // --- AKHIR PERBAIKAN 2 ---
+
         const semuaPetugas = [koordinator, ...petugasLapangan].filter(Boolean); 
 
         const pem = penilaian?.pemeriksaan || [];
@@ -660,9 +664,11 @@ export default function BeritaAcaraPemeriksaanPage() {
                                 <p>Petugas Lapangan {index + 1}</p>
                                 <div className="h-28 w-full my-2 flex items-center justify-center signature-image-container"> 
                                     {/* Gunakan signatureMap (sudah difilter) */}
+                                    {/* --- PERBAIKAN 1: Ganti URL Tanda Tangan --- */}
                                     {signatureMap[petugas.id] ? ( 
-                                        <img src={`http://127.0.0.1:8000/storage/${signatureMap[petugas.id]}`} alt={`Tanda Tangan ${petugas.nama}`} className="h-full object-contain"/>
+                                        <img src={`${api.defaults.baseURL}/signatures/${signatureMap[petugas.id]}`} alt={`Tanda Tangan ${petugas.nama}`} className="h-full object-contain"/>
                                     ) : (
+                                    // --- AKHIR PERBAIKAN 1 ---
                                         <span className="text-gray-400 text-sm">(Belum TTD di Penilaian)</span>
                                     )}
                                 </div>
