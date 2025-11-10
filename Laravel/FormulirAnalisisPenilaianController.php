@@ -21,7 +21,9 @@ class FormulirAnalisisPenilaianController extends Controller
         $formulir = FormulirAnalisisPenilaian::where('penilaian_id', $penilaian->id)->first();
         
         if (!$formulir) {
-            return response()->json(null, 200); // Kirim null jika belum ada
+            // --- MODIFIKASI: Kirim 404 jika tidak ditemukan ---
+            // Ini akan ditangani oleh blok catch di frontend
+            return response()->json(['message' => 'Formulir analisis belum ada.'], 404);
         }
 
         return response()->json($formulir);
@@ -43,16 +45,22 @@ class FormulirAnalisisPenilaianController extends Controller
             'luas_dikuasai_kesesuaian_rtr' => 'nullable|string',
             'kdb_ketentuan_rtr' => 'nullable|string',
             'kdb_kesesuaian_rtr' => 'nullable|string',
+            'kdb_rasio_manual' => 'nullable|string', // BARU
+            'kdb_persen_manual' => 'nullable|string', // BARU
             'klb_luas_tanah' => 'nullable|string',
             'klb_ketentuan_rtr' => 'nullable|string',
             'klb_kesesuaian_rtr' => 'nullable|string',
+            'klb_rasio_manual' => 'nullable|string', // BARU
             'kdh_luas_tanah' => 'nullable|string',
             'kdh_perbandingan_vegetasi' => 'nullable|string',
             'kdh_ketentuan_rtr' => 'nullable|string',
             'kdh_kesesuaian_rtr' => 'nullable|string',
+            'kdh_rasio_manual' => 'nullable|string', // BARU
             'ktb_luas_tanah' => 'nullable|string',
             'ktb_ketentuan_rtr' => 'nullable|string',
             'ktb_kesesuaian_rtr' => 'nullable|string',
+            'ktb_rasio_manual' => 'nullable|string', // BARU
+            'ktb_persen_manual' => 'nullable|string', // BARU
             'gsb_ketentuan_rtr' => 'nullable|string',
             'gsb_kesesuaian_rtr' => 'nullable|string',
             'jbb_ketentuan_rtr' => 'nullable|string',
