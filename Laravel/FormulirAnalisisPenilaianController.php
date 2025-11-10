@@ -1,0 +1,147 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\FormulirAnalisisPenilaian;
+use App\Models\Penilaian;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+
+class FormulirAnalisisPenilaianController extends Controller
+{
+    /**
+     * Menampilkan data formulir analisis berdasarkan ID Penilaian.
+     */
+    public function show(Penilaian $penilaian)
+    {
+        $formulir = FormulirAnalisisPenilaian::where('penilaian_id', $penilaian->id)->first();
+        
+        if (!$formulir) {
+            return response()->json(null, 200); // Kirim null jika belum ada
+        }
+
+        return response()->json($formulir);
+    }
+
+    /**
+     * Menyimpan atau memperbarui data formulir analisis.
+     */
+    public function store(Request $request, Penilaian $penilaian)
+    {
+        $validatedData = $request->validate([
+            'lokasi_kesesuaian_pmp_eksisting' => 'nullable|string',
+            'jenis_kesesuaian_pmp_eksisting' => 'nullable|string',
+            'jenis_ketentuan_rtr' => 'nullable|string',
+            'jenis_kesesuaian_rtr' => 'nullable|string',
+            'luas_digunakan_ketentuan_rtr' => 'nullable|string',
+            'luas_digunakan_kesesuaian_rtr' => 'nullable|string',
+            'luas_dikuasai_ketentuan_rtr' => 'nullable|string',
+            'luas_dikuasai_kesesuaian_rtr' => 'nullable|string',
+            'kdb_ketentuan_rtr' => 'nullable|string',
+            'kdb_kesesuaian_rtr' => 'nullable|string',
+            'klb_luas_tanah' => 'nullable|string',
+            'klb_ketentuan_rtr' => 'nullable|string',
+            'klb_kesesuaian_rtr' => 'nullable|string',
+            'kdh_luas_tanah' => 'nullable|string',
+            'kdh_perbandingan_vegetasi' => 'nullable|string',
+            'kdh_ketentuan_rtr' => 'nullable|string',
+            'kdh_kesesuaian_rtr' => 'nullable|string',
+            'ktb_luas_tanah' => 'nullable|string',
+            'ktb_ketentuan_rtr' => 'nullable|string',
+            'ktb_kesesuaian_rtr' => 'nullable|string',
+            'gsb_ketentuan_rtr' => 'nullable|string',
+            'gsb_kesesuaian_rtr' => 'nullable|string',
+            'jbb_ketentuan_rtr' => 'nullable|string',
+            'jbb_kesesuaian_rtr' => 'nullable|string',
+            'tanda_tangan_tim' => 'nullable|array',
+            'tanda_tangan_tim.*.user_id' => 'required_with:tanda_tangan_tim|exists:users,id',
+            'tanda_tangan_tim.*.signature' => 'required_with:tanda_tangan_tim|string',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Proses penyimpanan tanda tangan tim
+            $tandaTanganPaths = [];
+            if (!empty($validatedData['tanda_tangan_tim'])) {
+                foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
+                    if (Str::startsWith($tandaTangan['signature'], 'data:image')) {
+                         $path = $this->saveSignature($tandaTangan['signature'], 'ttd_analisis_' . $tandaTangan['user_id']);
+                         $tandaTanganPaths[] = [
+                            'user_id' => $tandaTangan['user_id'],
+                            'signature_path' => $path
+                        ];
+                    } else {
+                        // Jika bukan base64 baru, asumsikan itu path lama
+                        $tandaTanganPaths[] = [
+                            'user_id' => $tandaTangan['user_id'],
+                            'signature_path' => $tandaTangan['signature'] // simpan path yang ada
+                        ];
+                    }
+                }
+            }
+            
+            // Ambil TTD yang sudah ada
+            $existingFormulir = FormulirAnalisisPenilaian::where('penilaian_id', $penilaian->id)->first();
+            $existingSignatures = $existingFormulir?->tanda_tangan_tim ?? [];
+            $existingSigMap = collect($existingSignatures)->keyBy('user_id');
+
+            // Gabungkan TTD lama dan baru
+            foreach ($tandaTanganPaths as $newSig) {
+                $existingSigMap[$newSig['user_id']] = $newSig;
+            }
+
+            // Masukkan data TTD yang sudah digabung ke validatedData
+            $validatedData['tanda_tangan_tim'] = $existingSigMap->values()->all();
+
+            $formulir = FormulirAnalisisPenilaian::updateOrCreate(
+                ['penilaian_id' => $penilaian->id],
+                $validatedData
+            );
+
+            DB::commit();
+            return response()->json($formulir, 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error saving Formulir Analisis: " . $e->getMessage());
+            return response()->json(['message' => 'Gagal menyimpan formulir analisis: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Fungsi helper untuk menyimpan tanda tangan base64 (copy dari PenilaianController)
+     */
+    private function saveSignature($base64Image, $prefix)
+    {
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+            $data = substr($base64Image, strpos($base64Image, ',') + 1);
+            $type = strtolower($type[1]);
+
+            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+                throw new \InvalidArgumentException('Tipe gambar tidak valid.');
+            }
+            $data = base64_decode($data);
+
+            if ($data === false) {
+                throw new \RuntimeException('Gagal melakukan decode base64.');
+            }
+        } else {
+            throw new \InvalidArgumentException('Format data URI gambar tidak sesuai.');
+        }
+
+        $fileOnlyName = $prefix . '_' . Str::uuid() . '.' . $type;
+        $fullPath = 'signatures/' . $fileOnlyName;
+
+        if (!Storage::disk('public')->put($fullPath, $data)) {
+             throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fullPath}");
+        }
+        
+        // Kembalikan HANYA nama filenya
+        return $fileOnlyName;
+    }
+}

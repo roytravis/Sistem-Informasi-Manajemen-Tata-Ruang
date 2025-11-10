@@ -11,40 +11,37 @@ use Illuminate\Support\Facades\Route;
 use App\Models\Pemegang;
 use App\Models\User;
 use App\Http\Controllers\Api\BeritaAcaraController;
-use App\Http\Controllers\Api\BaPemeriksaanController; // <-- DITAMBAHKAN
+use App\Http\Controllers\Api\BaPemeriksaanController;
+// --- PENAMBAHAN BARU ---
+use App\Http\Controllers\Api\FormulirAnalisisPenilaianController;
+// --- AKHIR PENAMBAHAN ---
 
 // Rute publik untuk login dan register
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// --- PENAMBAHAN: Rute untuk mengambil file tanda tangan ---
-// Rute ini harus di luar grup auth:sanctum agar tag <img> di browser bisa mengaksesnya
+// Rute untuk mengambil file tanda tangan
 Route::get('/signatures/{filename}', [PenilaianController::class, 'getSignatureImage']);
-// --- AKHIR PENAMBAHAN ---
 
 // Rute yang dilindungi (membutuhkan otentikasi)
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // PERUBAHAN: 'Penanggung Jawab' diubah menjadi 'Koordinator Lapangan'
     Route::get('/users', function() {
         return User::whereIn('role', ['Koordinator Lapangan', 'Ketua Tim', 'Admin', 'Petugas Lapangan', 'Sekretariat'])->orderBy('nama')->get();
     });
     
-    // PERUBAHAN: 'Penanggung Jawab' diubah menjadi 'Koordinator Lapangan'
     Route::apiResource('pemegangs', PemegangController::class)->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Sekretariat');
     
     Route::apiResource('kasus', KasusController::class)
          ->parameters(['kasus' => 'kasus'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
     
-    // PERUBAHAN: 'Penanggung Jawab' diubah menjadi 'Koordinator Lapangan'
     Route::post('/kasus/{kasus}/verifikasi', [KasusController::class, 'verifikasi'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim');
 
     // --- BLOK RUTE TIM ---
-    // PERUBAHAN: 'Penanggung Jawab' diubah menjadi 'Koordinator Lapangan'
     Route::get('/tims', [TimController::class, 'index'])->middleware('role:Admin,Sekretariat,Koordinator Lapangan,Ketua Tim');
     Route::get('/tims/{tim}', [TimController::class, 'show'])->middleware('role:Admin,Sekretariat,Koordinator Lapangan,Ketua Tim');
     
@@ -61,7 +58,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // --- BLOK RUTE PERMOHONAN PENILAIAN ---
-    // PERUBAHAN: 'Penanggung Jawab' diubah menjadi 'Koordinator Lapangan'
     Route::get('/permohonan-penilaian', [PermohonanPenilaianController::class, 'index'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
     Route::post('/permohonan-penilaian', [PermohonanPenilaianController::class, 'store'])
@@ -75,7 +71,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     // --- BLOK RUTE PROSES PENILAIAN ---
-    // PERUBAHAN: 'Penanggung Jawab' diubah menjadi 'Koordinator Lapangan'
     Route::post('/penilaian/initiate/{permohonanPenilaian}', [PenilaianController::class, 'initiatePenilaian'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
@@ -84,10 +79,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/penilaian/pmp-umk/{kasus}', [PenilaianController::class, 'storePenilaian'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
-    // --- PENAMBAHAN: Rute untuk Save Draft ---
     Route::post('/penilaian/pmp-umk/{kasus}/draft', [PenilaianController::class, 'saveDraft'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
-    // --- AKHIR PENAMBAHAN ---
 
      // --- BLOK RUTE BERITA ACARA (TIDAK TERLAKSANA) ---
     Route::post('/berita-acara', [BeritaAcaraController::class, 'store'])
@@ -95,14 +88,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/berita-acara/{beritaAcara}', [BeritaAcaraController::class, 'show'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
-    // --- RUTE BERITA ACARA PEMERIKSAAN (MANUAL) --- <-- DITAMBAHKAN
+    // --- RUTE BERITA ACARA PEMERIKSAAN (MANUAL) ---
     Route::post('/ba-pemeriksaan', [BaPemeriksaanController::class, 'store'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 
     Route::get('/ba-pemeriksaan/{penilaian}', [BaPemeriksaanController::class, 'show'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
-    // --- AKHIR RUTE BERITA ACARA PEMERIKSAAN ---
 
-    // --- Rute tanda tangan DIPINDAHKAN dari sini ---
+    // --- RUTE FORMULIR ANALISIS PENILAIAN ---
+    Route::get('/formulir-analisis/{penilaian}', [FormulirAnalisisPenilaianController::class, 'show'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+    Route::post('/formulir-analisis/{penilaian}', [FormulirAnalisisPenilaianController::class, 'store'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+    // --- AKHIR PENAMBAHAN ---
 });
-

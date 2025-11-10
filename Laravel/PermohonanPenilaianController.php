@@ -12,8 +12,13 @@ class PermohonanPenilaianController extends Controller
 {
     public function index(Request $request)
     {
-        // PERBAIKAN: Eager load relasi 'beritaAcara'
-        $query = PermohonanPenilaian::with(['pemegang', 'kasus.penilaian', 'beritaAcara']);
+        // PERBAIKAN: Eager load relasi 'baPemeriksaan' dan 'formulirAnalisis'
+        $query = PermohonanPenilaian::with([
+            'pemegang', 
+            'kasus.penilaian.baPemeriksaan', // Memuat BA Pemeriksaan
+            'kasus.penilaian.formulirAnalisis', // Memuat Formulir Analisis (jika ada)
+            'beritaAcara' // BA Tidak Terlaksana
+        ]);
 
         // --- PERUBAHAN LOGIKA FILTER 'PENDING' ---
         if ($request->query('status') === 'pending') {

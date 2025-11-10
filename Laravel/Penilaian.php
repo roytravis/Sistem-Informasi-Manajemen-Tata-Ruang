@@ -38,4 +38,20 @@ class Penilaian extends Model
     }
 
     // Relasi 'penilai()' tunggal tidak lagi relevan karena penilai adalah tim.
+
+    /**
+     * PENAMBAHAN: Relasi ke Berita Acara Pemeriksaan.
+     */
+    public function baPemeriksaan()
+    {
+        return $this->hasOne(BaPemeriksaan::class);
+    }
+
+    /**
+     * PENAMBAHAN: Relasi ke Formulir Analisis Penilaian.
+     */
+    public function formulirAnalisis()
+    {
+        return $this->hasOne(FormulirAnalisisPenilaian::class);
+    }
 }
