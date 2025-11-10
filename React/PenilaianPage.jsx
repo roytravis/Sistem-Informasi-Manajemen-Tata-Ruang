@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios.js';
 
-// --- PERUBAHAN: Komponen Badge Status ---
+// Komponen Badge Status
 const StatusPenilaianBadge = ({ permohonan }) => {
     // 1. Cek status BA (Tidak Terlaksana)
     if (permohonan.status === 'Penilaian Tidak Terlaksana' && permohonan.berita_acara_id) {
@@ -22,13 +22,13 @@ const StatusPenilaianBadge = ({ permohonan }) => {
         if (statusKasus && statusKasus.toLowerCase().includes('selesai')) {
              return <span className="py-1 px-3 rounded-full text-xs font-medium bg-green-200 text-green-800">{statusKasus}</span>;
         }
-        return <span className="py-1 px-3 rounded-full text-xs font-medium bg-teal-200 text-teal-800">Selesai Dinilai</span>;
+        // --- PERUBAHAN TULISAN STATUS ---
+        return <span className="py-1 px-3 rounded-full text-xs font-medium bg-teal-200 text-teal-800">Selesai Dinilai (Verifikasi)</span>;
     }
     
     // 4. Status default (cth: 'Baru', 'Menunggu Penilaian')
     return <span className="py-1 px-3 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">{permohonan.status || 'Menunggu'}</span>;
 };
-// --- AKHIR PERUBAHAN ---
 
 export default function PenilaianPage() {
     const [pmpList, setPmpList] = useState([]);
@@ -45,6 +45,7 @@ export default function PenilaianPage() {
         setError('');
         setLoading(true);
         try {
+            // API call sekarang mengambil relasi baPemeriksaan
             const response = await api.get(`/permohonan-penilaian?page=${page}&status=${statusFilter}`);
             setPmpList(response.data.data);
             setPagination({
@@ -75,18 +76,13 @@ export default function PenilaianPage() {
         setIsNavigating(permohonan.id);
         setError('');
         try {
-            // --- PERUBAHAN: Logika inisiasi kasus ---
-            // Jika status 'Draft', kasus PASTI sudah ada.
-            // Jika status 'Baru' atau 'Menunggu Penilaian' TAPI belum ada kasus, inisiasi.
             if (permohonan.kasus?.id) {
                 navigate(`/penilaian/${permohonan.kasus.id}`);
             } else {
-                // Inisiasi kasus jika belum ada (cth: status 'Baru' atau 'Menunggu Penilaian' awal)
                 const response = await api.post(`/penilaian/initiate/${permohonan.id}`);
                 const { kasus_id } = response.data;
                 navigate(`/penilaian/${kasus_id}`);
             }
-            // --- AKHIR PERUBAHAN ---
         } catch (err) {
             setError('Gagal memproses penilaian. Silakan coba lagi.');
         } finally {
@@ -153,75 +149,89 @@ export default function PenilaianPage() {
                                 </thead>
                                 <tbody className="text-gray-700 divide-y divide-gray-200">
                                     {pmpList.length > 0 ? pmpList.map(p => {
-                                        // --- PERUBAHAN: Logika Aksi Disederhanakan ---
                                         const tidakTerlaksana = p.status === 'Penilaian Tidak Terlaksana' && p.berita_acara_id;
                                         const isDraft = p.status === 'Draft';
-                                        // "Selesai Dinilai" berarti ada penilaian DAN statusnya BUKAN draft
+                                        
+                                        // Cek Selesai Dinilai: ada penilaian, bukan draft
                                         const sudahDinilai = p.kasus && p.kasus.penilaian && !isDraft;
-                                        // --- AKHIR PERUBAHAN ---
+                                        
+                                        // --- PENGECEKAN BARU UNTUK TOMBOL ANALISIS ---
+                                        // Status Selesai Dinilai (mencakup 'Selesai - Patuh', 'Selesai - Tidak Patuh', 'Menunggu Verifikasi')
+                                        const isSelesaiDinilai = sudahDinilai && (p.kasus.status.toLowerCase().includes('selesai') || p.kasus.status === 'Menunggu Verifikasi');
+                                        // Cek apakah BA Pemeriksaan sudah dibuat (data relasi sudah di-load)
+                                        const baPemeriksaanDibuat = p.kasus?.penilaian?.ba_pemeriksaan;
+                                        
+                                        const showAnalisisButton = isSelesaiDinilai && baPemeriksaanDibuat;
+                                        // --- AKHIR PENGECEKAN BARU ---
 
                                         return (
                                         <tr key={p.id} className="hover:bg-gray-50">
                                             <td className="py-3 px-4">{p.pemegang?.nama_pelaku_usaha || '-'}</td>
                                             <td className="py-3 px-4 font-mono">{p.pemegang?.nomor_identitas || '-'}</td>
                                             <td className="py-3 px-4"><StatusPenilaianBadge permohonan={p} /></td>
-                                            <td className="py-3 px-4 flex items-center space-x-2">
-                                                
-                                                {/* --- PERUBAHAN: Logika Tombol Aksi Utama --- */}
-                                                {tidakTerlaksana ? (
-                                                    <button 
-                                                        onClick={() => navigate(`/penilaian/berita-acara/${p.berita_acara_id}/preview`)} 
-                                                        className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
-                                                    >
-                                                        Detail BA
-                                                    </button>
-                                                ) : (
-                                                    <button 
-                                                        onClick={() => handleNilai(p)} 
-                                                        disabled={isNavigating === p.id} 
-                                                        // Ganti warna tombol jika status 'Draft'
-                                                        className={`font-semibold py-1 px-3 rounded-md text-sm text-white ${
-                                                            isDraft 
-                                                                ? 'bg-orange-500 hover:bg-orange-600' // Tombol 'Lanjutkan'
-                                                                : 'bg-blue-600 hover:bg-blue-700' // Tombol 'Nilai' atau 'Detail'
-                                                        } disabled:bg-gray-400`}
-                                                    >
-                                                        {isNavigating === p.id 
-                                                            ? '...' 
-                                                            : (isDraft ? 'Lanjutkan Penilaian' : (sudahDinilai ? 'Detail' : 'Nilai'))
-                                                        }
-                                                    </button>
-                                                )}
-                                                {/* --- AKHIR PERUBAHAN --- */}
-                                                
-                                                {/* Tombol Berita Acara Pemeriksaan (setelah selesai dinilai) */}
-                                                {sudahDinilai && !tidakTerlaksana && (
-                                                    <button
-                                                        onClick={() => navigate(`/penilaian/${p.kasus.id}/berita-acara-pemeriksaan`)}
-                                                        className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
-                                                    >
-                                                        Berita Acara
-                                                    </button>
-                                                )}
-                                                
-                                                {/* Tombol Edit (Hanya jika tidak terlaksana atau draft) */}
-                                                {!tidakTerlaksana && (
-                                                    <button 
-                                                        onClick={() => handleEdit(p.id)} 
-                                                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                )}
+                                            <td className="py-3 px-4">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {tidakTerlaksana ? (
+                                                        <button 
+                                                            onClick={() => navigate(`/penilaian/berita-acara/${p.berita_acara_id}/preview`)} 
+                                                            className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                        >
+                                                            Detail BA
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => handleNilai(p)} 
+                                                            disabled={isNavigating === p.id} 
+                                                            className={`font-semibold py-1 px-3 rounded-md text-sm text-white ${
+                                                                isDraft 
+                                                                    ? 'bg-orange-500 hover:bg-orange-600' // Tombol 'Lanjutkan'
+                                                                    : 'bg-blue-600 hover:bg-blue-700' // Tombol 'Nilai' atau 'Detail'
+                                                            } disabled:bg-gray-400`}
+                                                        >
+                                                            {isNavigating === p.id 
+                                                                ? '...' 
+                                                                : (isDraft ? 'Lanjutkan Penilaian' : (sudahDinilai ? 'Detail' : 'Nilai'))
+                                                            }
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {/* Tombol Berita Acara Pemeriksaan (setelah selesai dinilai) */}
+                                                    {sudahDinilai && !tidakTerlaksana && (
+                                                        <button
+                                                            onClick={() => navigate(`/penilaian/${p.kasus.id}/berita-acara-pemeriksaan`)}
+                                                            className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                        >
+                                                            Berita Acara
+                                                        </button>
+                                                    )}
 
-                                                {/* Tombol Hapus (Selalu ada) */}
-                                                <button 
-                                                    onClick={() => handleDelete(p.id)} 
-                                                    className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm"
-                                                >
-                                                    Hapus
-                                                </button>
+                                                    {/* --- TOMBOL BARU FORMULIR ANALISIS --- */}
+                                                    {showAnalisisButton && (
+                                                        <button
+                                                            onClick={() => navigate(`/penilaian/${p.kasus.id}/formulir-analisis`)}
+                                                            className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                        >
+                                                            Formulir Analisis
+                                                        </button>
+                                                    )}
+                                                    {/* --- AKHIR TOMBOL BARU --- */}
+                                                    
+                                                    {!tidakTerlaksana && (
+                                                        <button 
+                                                            onClick={() => handleEdit(p.id)} 
+                                                            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    )}
 
+                                                    <button 
+                                                        onClick={() => handleDelete(p.id)} 
+                                                        className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                    >
+                                                        Hapus
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                         )
