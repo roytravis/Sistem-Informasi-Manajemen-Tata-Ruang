@@ -28,13 +28,14 @@ const ReadOnlyInput = ({ value, className = "" }) => (
 );
 
 // Komponen untuk input manual
-const ManualInput = ({ name, value, onChange, placeholder = "", type = "text" }) => (
+const ManualInput = ({ name, value, onChange, placeholder = "", type = "text", title = "" }) => (
     <input
         type={type}
         name={name}
         value={value || ''}
         onChange={onChange}
         placeholder={placeholder}
+        title={title} // Menambahkan tooltip
         className="w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
     />
 );
@@ -118,20 +119,32 @@ export default function FormulirAnalisisPage() {
         luas_digunakan_kesesuaian_rtr: 'Sesuai',
         luas_dikuasai_ketentuan_rtr: '',
         luas_dikuasai_kesesuaian_rtr: 'Sesuai',
+        // C.1 KDB
         kdb_ketentuan_rtr: '',
         kdb_kesesuaian_rtr: 'Sesuai',
+        kdb_rasio_manual: '', // BARU
+        kdb_persen_manual: '', // BARU
+        // C.2 KLB
         klb_luas_tanah: '',
         klb_ketentuan_rtr: '',
         klb_kesesuaian_rtr: 'Sesuai',
+        klb_rasio_manual: '', // BARU
+        // C.3 KDH
         kdh_luas_tanah: '',
         kdh_perbandingan_vegetasi: '',
         kdh_ketentuan_rtr: '',
         kdh_kesesuaian_rtr: 'Sesuai',
+        kdh_rasio_manual: '', // BARU
+        // C.4 KTB
         ktb_luas_tanah: '',
         ktb_ketentuan_rtr: '',
         ktb_kesesuaian_rtr: 'Sesuai',
+        ktb_rasio_manual: '', // BARU
+        ktb_persen_manual: '', // BARU
+        // C.5 GSB
         gsb_ketentuan_rtr: '',
         gsb_kesesuaian_rtr: 'Sesuai',
+        // C.6 JBB
         jbb_ketentuan_rtr: '',
         jbb_kesesuaian_rtr: 'Sesuai',
         tanda_tangan_tim: [], // { user_id, signature }
@@ -230,37 +243,23 @@ export default function FormulirAnalisisPage() {
         };
     }, [penilaian, kasus]);
     
-    // Data Kalkulasi (C.1 s/d C.4)
-    const dataKalkulasi = useMemo(() => {
-        const kdb_luas_tanah = parseFloat(dataPrefill.luas_dikuasai) || 0;
-        const kdb_luas_dasar = parseFloat(dataPrefill.kdb_luas_lantai_dasar) || 0;
-        
-        const klb_luas_tanah = parseFloat(formData.klb_luas_tanah) || 0;
-        const klb_luas_total = parseFloat(dataPrefill.klb_luas_seluruh_lantai) || 0;
-        
-        const kdh_luas_tanah = parseFloat(formData.kdh_luas_tanah) || 0;
-        const kdh_vegetasi = parseFloat(dataPrefill.kdh_vegetasi) || 0;
-        const kdh_perkerasan = parseFloat(dataPrefill.kdh_perkerasan) || 0;
-        
-        const ktb_luas_tanah = parseFloat(formData.ktb_luas_tanah) || 0;
-        const ktb_basemen = parseFloat(dataPrefill.ktb_luas_basemen) || 0;
-
-        const hitungRasio = (a, b) => (b > 0 ? (a / b) : 0);
-        
-        return {
-            kdb_rasio: hitungRasio(kdb_luas_dasar, kdb_luas_tanah).toFixed(2),
-            kdb_persen: (hitungRasio(kdb_luas_dasar, kdb_luas_tanah) * 100).toFixed(2),
-            klb_rasio: hitungRasio(klb_luas_total, klb_luas_tanah).toFixed(2),
-            kdh_rasio: hitungRasio(kdh_vegetasi + kdh_perkerasan, kdh_luas_tanah).toFixed(2),
-            ktb_rasio: hitungRasio(ktb_basemen, ktb_luas_tanah).toFixed(2),
-            ktb_persen: (hitungRasio(ktb_basemen, ktb_luas_tanah) * 100).toFixed(2),
-        };
-    }, [dataPrefill, formData.klb_luas_tanah, formData.kdh_luas_tanah, formData.ktb_luas_tanah]);
+    // --- DIHAPUS ---
+    // const dataKalkulasi = useMemo(() => { ... });
+    // --- AKHIR DIHAPUS ---
     
     // Handler untuk perubahan input form manual
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    // --- BARU: Handler untuk input numerik ---
+    const handleNumericChange = (e) => {
+        const { name, value } = e.target;
+        // Regex: izinkan string kosong, angka, dan satu titik desimal
+        if (value === '' || /^\d*(\.\d*)?$/.test(value)) {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
     
     // Tim Penilai (Petugas Lapangan, Koordinator, Ketua Tim)
@@ -442,7 +441,7 @@ export default function FormulirAnalisisPage() {
                                     <tr>
                                         <TableHeader colSpan={2}>Komponen</TableHeader>
                                         <TableHeader>Hasil Pemeriksaan & Pengukuran</TableHeader>
-                                        <TableHeader>Perhitungan</TableHeader>
+                                        <TableHeader>Perhitungan (Input Manual)</TableHeader>
                                         <TableHeader>Ketentuan RTR</TableHeader>
                                         <TableHeader>Hasil Kesesuaian dengan RTR</TableHeader>
                                     </tr>
@@ -454,14 +453,14 @@ export default function FormulirAnalisisPage() {
                                         <TableCell>Luas Tanah yang digunakan</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.luas_digunakan} /></TableCell>
                                         <TableCell><ReadOnlyInput value="-" /></TableCell>
-                                        <TableCell><ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} /></TableCell>
+                                        <TableCell><ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} title="Ketentuan RTR Luas Tanah Digunakan" /></TableCell>
                                         <TableCell><SelectInput name="luas_digunakan_kesesuaian_rtr" value={formData.luas_digunakan_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
                                     </tr>
                                     <tr>
                                         <TableCell>Luas Tanah yang dikuasai</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.luas_dikuasai} /></TableCell>
                                         <TableCell><ReadOnlyInput value="-" /></TableCell>
-                                        <TableCell><ManualInput name="luas_dikuasai_ketentuan_rtr" value={formData.luas_dikuasai_ketentuan_rtr} onChange={handleChange} /></TableCell>
+                                        <TableCell><ManualInput name="luas_dikuasai_ketentuan_rtr" value={formData.luas_dikuasai_ketentuan_rtr} onChange={handleChange} title="Ketentuan RTR Luas Tanah Dikuasai"/></TableCell>
                                         <TableCell><SelectInput name="luas_dikuasai_kesesuaian_rtr" value={formData.luas_dikuasai_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
                                     </tr>
 
@@ -471,7 +470,26 @@ export default function FormulirAnalisisPage() {
                                         <TableCell>Luas Lantai Dasar Bangunan</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.kdb_luas_lantai_dasar} /></TableCell>
                                         <TableCell rowSpan={3}>
-                                            <ReadOnlyInput value={`Rasio: ${dataKalkulasi.kdb_rasio}\nPersen: ${dataKalkulasi.kdb_persen}%`} className="whitespace-pre-wrap" />
+                                            {/* --- MODIFIKASI: Input Manual KDB --- */}
+                                            <div className="space-y-2">
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="kdb_rasio_manual"
+                                                    value={formData.kdb_rasio_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Rasio (Contoh: 0.6)"
+                                                    title="Input Manual: Luas Lantai Dasar : Luas Tanah"
+                                                />
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="kdb_persen_manual"
+                                                    value={formData.kdb_persen_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Persen (Contoh: 60)"
+                                                    title="Input Manual: Perbandingan (x100%)"
+                                                />
+                                            </div>
+                                            {/* --- AKHIR MODIFIKASI --- */}
                                         </TableCell>
                                         <TableCell rowSpan={3}><ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} placeholder="Misal: 60%" /></TableCell>
                                         <TableCell rowSpan={3}><SelectInput name="kdb_kesesuaian_rtr" value={formData.kdb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
@@ -491,7 +509,16 @@ export default function FormulirAnalisisPage() {
                                         <TableCell>Jumlah Lantai Bangunan</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.klb_jumlah_lantai} /></TableCell>
                                         <TableCell rowSpan={4}>
-                                            <ReadOnlyInput value={`Rasio: ${dataKalkulasi.klb_rasio}`} />
+                                            {/* --- MODIFIKASI: Input Manual KLB --- */}
+                                            <ManualInput 
+                                                type="text"
+                                                name="klb_rasio_manual"
+                                                value={formData.klb_rasio_manual}
+                                                onChange={handleNumericChange}
+                                                placeholder="Rasio (Contoh: 1.2)"
+                                                title="Input Manual: Luas Seluruh Lantai : Luas Tanah"
+                                            />
+                                            {/* --- AKHIR MODIFIKASI --- */}
                                         </TableCell>
                                         <TableCell rowSpan={4}><ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} placeholder="Misal: 1.2" /></TableCell>
                                         <TableCell rowSpan={4}><SelectInput name="klb_kesesuaian_rtr" value={formData.klb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
@@ -502,7 +529,8 @@ export default function FormulirAnalisisPage() {
                                     </tr>
                                     <tr>
                                         <TableCell>Luas Tanah</TableCell>
-                                        <TableCell><ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="number" /></TableCell>
+                                        {/* MODIFIKASI: Ubah ke handleNumericChange */}
+                                        <TableCell><ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" /></TableCell>
                                     </tr>
                                     <tr>
                                         <TableCell>Perhitungan KLB</TableCell>
@@ -513,8 +541,8 @@ export default function FormulirAnalisisPage() {
                                         <TableCell>Ketinggian Bangunan</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.klb_ketinggian} /></TableCell>
                                         <TableCell><ReadOnlyInput value="-" /></TableCell>
-                                        <TableCell><ManualInput value="-" onChange={()=>{}} /></TableCell> {/* Sesuai PDF, Ketentuan RTR ada di row KLB */}
-                                        <TableCell><SelectInput value="Sesuai" onChange={()=>{}}>{dropdownSesuai}</SelectInput></TableCell>
+                                        <TableCell><ManualInput value="-" onChange={()=>{}} disabled className="bg-gray-100" /></TableCell> {/* Sesuai PDF, Ketentuan RTR ada di row KLB */}
+                                        <TableCell><SelectInput value="Sesuai" onChange={()=>{}} disabled className="bg-gray-100">{dropdownSesuai}</SelectInput></TableCell>
                                     </tr>
 
                                     {/* C.3. KDH */}
@@ -523,7 +551,16 @@ export default function FormulirAnalisisPage() {
                                         <TableCell>Luas Tanah Terdapat Vegetasi</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.kdh_vegetasi} /></TableCell>
                                         <TableCell rowSpan={4}>
-                                             <ReadOnlyInput value={`Rasio: ${dataKalkulasi.kdh_rasio}`} />
+                                            {/* --- MODIFIKASI: Input Manual KDH --- */}
+                                            <ManualInput 
+                                                type="text"
+                                                name="kdh_rasio_manual"
+                                                value={formData.kdh_rasio_manual}
+                                                onChange={handleNumericChange}
+                                                placeholder="Rasio (Contoh: 0.2)"
+                                                title="Input Manual: (Vegetasi + Perkerasan) : Luas Tanah"
+                                            />
+                                            {/* --- AKHIR MODIFIKASI --- */}
                                         </TableCell>
                                         <TableCell rowSpan={4}><ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} placeholder="Misal: 20%" /></TableCell>
                                         <TableCell rowSpan={4}><SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
@@ -534,11 +571,13 @@ export default function FormulirAnalisisPage() {
                                     </tr>
                                     <tr>
                                         <TableCell>Luas Tanah</TableCell>
-                                        <TableCell><ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="number" /></TableCell>
+                                        {/* MODIFIKASI: Ubah ke handleNumericChange */}
+                                        <TableCell><ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" /></TableCell>
                                     </tr>
                                     <tr>
                                         <TableCell>Perbandingan Vegetasi (x100%)</TableCell>
-                                        <TableCell><ManualInput name="kdh_perbandingan_vegetasi" value={formData.kdh_perbandingan_vegetasi} onChange={handleChange} placeholder="Input %" type="number" /></TableCell>
+                                        {/* MODIFIKASI: Ubah ke handleNumericChange */}
+                                        <TableCell><ManualInput name="kdh_perbandingan_vegetasi" value={formData.kdh_perbandingan_vegetasi} onChange={handleNumericChange} placeholder="Persen (Contoh: 20)" type="text" title="Input Manual: Perbandingan Vegetasi (x100%)" /></TableCell>
                                     </tr>
 
                                     {/* C.4. KTB */}
@@ -547,14 +586,34 @@ export default function FormulirAnalisisPage() {
                                         <TableCell>Luas Basemen</TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.ktb_luas_basemen} /></TableCell>
                                         <TableCell rowSpan={3}>
-                                            <ReadOnlyInput value={`Rasio: ${dataKalkulasi.ktb_rasio}\nPersen: ${dataKalkulasi.ktb_persen}%`} className="whitespace-pre-wrap" />
+                                            {/* --- MODIFIKASI: Input Manual KTB --- */}
+                                            <div className="space-y-2">
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="ktb_rasio_manual"
+                                                    value={formData.ktb_rasio_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Rasio (Contoh: 0.3)"
+                                                    title="Input Manual: Luas Basemen : Luas Tanah"
+                                                />
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="ktb_persen_manual"
+                                                    value={formData.ktb_persen_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Persen (Contoh: 30)"
+                                                    title="Input Manual: Perbandingan (x100%)"
+                                                />
+                                            </div>
+                                            {/* --- AKHIR MODIFIKASI --- */}
                                         </TableCell>
                                         <TableCell rowSpan={3}><ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} placeholder="Misal: 30%" /></TableCell>
                                         <TableCell rowSpan={3}><SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange}>{dropdownKtb}</SelectInput></TableCell>
                                     </tr>
                                     <tr>
                                         <TableCell>Luas Tanah</TableCell>
-                                        <TableCell><ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="number" /></TableCell>
+                                        {/* MODIFIKASI: Ubah ke handleNumericChange */}
+                                        <TableCell><ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" /></TableCell>
                                     </tr>
                                     <tr>
                                         <TableCell>Perhitungan KTB</TableCell>
