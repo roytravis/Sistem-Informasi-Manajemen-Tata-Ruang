@@ -35,22 +35,28 @@ return new class extends Migration
             // C.1. KDB
             $table->string('kdb_ketentuan_rtr')->nullable(); // Manual input
             $table->string('kdb_kesesuaian_rtr')->nullable(); // Dropdown
+            $table->string('kdb_rasio_manual')->nullable(); // BARU: Input manual
+            $table->string('kdb_persen_manual')->nullable(); // BARU: Input manual
 
             // C.2. KLB
             $table->string('klb_luas_tanah')->nullable(); // Manual input (Luas Tanah)
             $table->string('klb_ketentuan_rtr')->nullable(); // Manual input (Ketentuan RTR)
             $table->string('klb_kesesuaian_rtr')->nullable(); // Dropdown
+            $table->string('klb_rasio_manual')->nullable(); // BARU: Input manual
             
             // C.3. KDH
             $table->string('kdh_luas_tanah')->nullable(); // Manual input (Luas Tanah)
             $table->string('kdh_perbandingan_vegetasi')->nullable(); // Manual input (Perbandingan luas tanah vegetasi... x100%)
             $table->string('kdh_ketentuan_rtr')->nullable(); // Manual input
             $table->string('kdh_kesesuaian_rtr')->nullable(); // Dropdown
+            $table->string('kdh_rasio_manual')->nullable(); // BARU: Input manual
 
             // C.4. KTB
             $table->string('ktb_luas_tanah')->nullable(); // Manual input (Luas Tanah)
             $table->string('ktb_ketentuan_rtr')->nullable(); // Manual input
             $table->string('ktb_kesesuaian_rtr')->nullable(); // Dropdown (Sesuai, Tidak Sesuai, Belum Dapat Dinilai, dst.)
+            $table->string('ktb_rasio_manual')->nullable(); // BARU: Input manual
+            $table->string('ktb_persen_manual')->nullable(); // BARU: Input manual
 
             // C.5. GSB
             $table->string('gsb_ketentuan_rtr')->nullable(); // Manual input
