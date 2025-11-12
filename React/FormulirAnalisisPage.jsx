@@ -6,58 +6,51 @@ import { useAuth } from '../context/AuthContext';
 
 // --- Komponen-komponen Reusable ---
 
-/**
- * Komponen untuk baris header tabel
- */
+// (PERBAIKAN Poin 3) Padding seragam dan align-middle
 const TableHeader = ({ children, colSpan = 1, rowSpan = 1, className = "" }) => (
-    <th className={`p-2 border border-gray-400 bg-gray-100 font-semibold align-middle text-sm ${className}`} colSpan={colSpan} rowSpan={rowSpan}>
+    <th className={`py-2 px-3 border border-gray-300 bg-gray-100 font-semibold align-middle ${className}`} colSpan={colSpan} rowSpan={rowSpan}>
         {children}
     </th>
 );
 
-/**
- * Komponen untuk sel data (TD)
- */
-const TableCell = ({ children, className = "", colSpan = 1, rowSpan = 1 }) => (
-    <td className={`p-2 border border-gray-400 align-top ${className}`} colSpan={colSpan} rowSpan={rowSpan}>
+// (PERBAIKAN Poin 3) Padding seragam dan align-middle
+const TableCell = ({ children, className = "" }) => (
+    <td className={`py-2 px-3 border border-gray-300 align-middle ${className}`}>
         {children}
     </td>
 );
 
-/**
- * Komponen untuk input manual
- */
-const ManualInput = ({ name, value, onChange, placeholder = "", type = "text", title = "", disabled = false }) => (
+const ReadOnlyInput = ({ value, className = "" }) => (
+    <div className={`w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px] flex items-center ${className}`}>
+        {value || '-'}
+    </div>
+);
+
+// (PERBAIKAN Poin 6) Tambahkan text-right jika numerik
+const ManualInput = ({ name, value, onChange, placeholder = "", type = "text", title = "", className = "" }) => (
     <input
         type={type}
         name={name}
         value={value || ''}
         onChange={onChange}
         placeholder={placeholder}
-        title={title}
-        disabled={disabled}
-        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        title={title} // Menambahkan tooltip
+        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${type === 'text' && (name.includes('rasio') || name.includes('persen') || name.includes('luas')) ? 'text-right' : ''} ${className}`}
     />
 );
 
-/**
- * Komponen untuk dropdown
- */
-const SelectInput = ({ name, value, onChange, children, disabled = false }) => (
+const SelectInput = ({ name, value, onChange, children, className = "" }) => (
     <select
         name={name}
         value={value || ''}
         onChange={onChange}
-        disabled={disabled}
-        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`}
     >
         {children}
     </select>
 );
 
-/**
- * Komponen Tanda Tangan (Mirip PenilaianDetailPage)
- */
+// Komponen Tanda Tangan (Mirip PenilaianDetailPage)
 const PetugasPenilaiSignature = ({ member, signaturePath, signatureRef }) => {
     const baseUrl = api.defaults.baseURL;
     const imageUrl = signaturePath ? `${baseUrl}/signatures/${signaturePath}?t=${new Date().getTime()}` : null;
@@ -67,9 +60,9 @@ const PetugasPenilaiSignature = ({ member, signaturePath, signatureRef }) => {
             {/* Info Petugas */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Nama Petugas</label>
-                <p className="mt-0.5 p-2 border rounded-md bg-gray-100 text-sm">{member.nama}</p>
+                <p className="mt-0.5 p-2 border rounded-md bg-gray-100 text-sm min-h-[38px]">{member.nama}</p>
                 <label className="block text-sm font-medium text-gray-700 mt-1">Jabatan</label>
-                <p className="mt-0.5 p-2 border rounded-md bg-gray-100 text-sm">{member.pivot?.jabatan_di_tim || member.role}</p>
+                <p className="mt-0.5 p-2 border rounded-md bg-gray-100 text-sm min-h-[38px]">{member.pivot?.jabatan_di_tim || member.role}</p>
             </div>
             {/* Tanda Tangan */}
             <div>
@@ -98,117 +91,6 @@ const PetugasPenilaiSignature = ({ member, signaturePath, signatureRef }) => {
     );
 };
 
-// --- Komponen Baru Sesuai Juknis ---
-
-/**
- * Baris Header Seksi (misal: "KDB", "KLB")
- */
-const JuknisHeaderRow = ({ label }) => (
-    <tr className="bg-gray-50">
-        <TableCell className="font-semibold" colSpan={3}>
-            {label}
-        </TableCell>
-    </tr>
-);
-
-/**
- * Baris untuk data hasil pemeriksaan/pengukuran (read-only)
- */
-const JuknisDataRow = ({ label, value, unit }) => (
-    <tr>
-        <TableCell className="pl-6">
-            {label}
-        </TableCell>
-        <TableCell className="text-right pr-4">
-            {value ? (
-                <>
-                    {value}
-                    <span className="ml-2" dangerouslySetInnerHTML={{ __html: unit || '' }} />
-                </>
-            ) : ':'}
-        </TableCell>
-    </tr>
-);
-
-/**
- * Baris untuk input manual (misal: Luas Tanah di KLB, KDH, KTB)
- */
-const JuknisInputRow = ({ label, name, value, onChange, unit, type = "text" }) => (
-    <tr>
-        <TableCell className="pl-6">{label}</TableCell>
-        <TableCell>
-            <div className="flex items-center">
-                <span className="mr-2">:</span>
-                <ManualInput 
-                    type={type}
-                    name={name}
-                    value={value}
-                    onChange={onChange}
-                    placeholder="..."
-                    title={`Input Manual: ${label}`}
-                />
-                <span className="ml-2" dangerouslySetInnerHTML={{ __html: unit || '' }} />
-            </div>
-        </TableCell>
-    </tr>
-);
-
-/**
- * Baris untuk input perhitungan manual (Rasio / Persen)
- */
-const JuknisCalcRow = ({ label, name, value, onChange, unit, type = "text" }) => (
-    <tr>
-        <TableCell className="pl-10 italic">{label}</TableCell>
-        <TableCell>
-            <div className="flex items-center">
-                <span className="mr-2">:</span>
-                <ManualInput 
-                    type={type}
-                    name={name}
-                    value={value}
-                    onChange={onChange}
-                    placeholder="..."
-                    title={`Input Manual: ${label}`}
-                />
-                <span className="ml-2" dangerouslySetInnerHTML={{ __html: unit || '' }} />
-            </div>
-        </TableCell>
-    </tr>
-);
-
-/**
- * Sel untuk Kolom Ketentuan RTR dan Hasil Kesesuaian
- */
-const JuknisRTRCell = ({ 
-    rtrHeader, rtrName, rtrValue, onRtrChange, rtrPlaceholder, 
-    kesesuaianName, kesesuaianValue, onKesesuaianChange, 
-    rowSpan, children 
-}) => (
-    <>
-        <TableCell rowSpan={rowSpan} className="w-1/4">
-            <div className="flex flex-col h-full">
-                {rtrHeader && <label className="font-semibold block mb-2">{rtrHeader}</label>}
-                <ManualInput 
-                    name={rtrName}
-                    value={rtrValue}
-                    onChange={onRtrChange}
-                    placeholder={rtrPlaceholder}
-                    title={`Ketentuan RTR: ${rtrHeader}`}
-                />
-            </div>
-        </TableCell>
-        <TableCell rowSpan={rowSpan} className="w-1/4">
-            <SelectInput 
-                name={kesesuaianName}
-                value={kesesuaianValue}
-                onChange={onKesesuaianChange}
-            >
-                {children}
-            </SelectInput>
-        </TableCell>
-    </>
-);
-
 
 // --- Komponen Utama Halaman ---
 
@@ -231,33 +113,35 @@ export default function FormulirAnalisisPage() {
         jenis_kesesuaian_pmp_eksisting: 'Sesuai',
         jenis_ketentuan_rtr: '',
         jenis_kesesuaian_rtr: 'Sesuai',
-        luas_digunakan_ketentuan_rtr: '', // Tidak ada di Juknis, tapi ada di model
-        luas_digunakan_kesesuaian_rtr: 'Sesuai', // Tidak ada di Juknis
-        luas_dikuasai_ketentuan_rtr: '', // Tidak ada di Juknis
-        luas_dikuasai_kesesuaian_rtr: 'Sesuai', // Tidak ada di Juknis
+        luas_digunakan_ketentuan_rtr: '',
+        luas_digunakan_kesesuaian_rtr: 'Sesuai',
+        luas_dikuasai_ketentuan_rtr: '',
+        luas_dikuasai_kesesuaian_rtr: 'Sesuai',
         // C.1 KDB
         kdb_ketentuan_rtr: '',
         kdb_kesesuaian_rtr: 'Sesuai',
-        kdb_rasio_manual: '', 
-        kdb_persen_manual: '',
+        kdb_rasio_manual: '', // BARU
+        kdb_persen_manual: '', // BARU
         // C.2 KLB
         klb_luas_tanah: '',
         klb_ketentuan_rtr: '',
         klb_kesesuaian_rtr: 'Sesuai',
-        klb_rasio_manual: '',
-        // Ketinggian (Tidak ada di model)
+        klb_rasio_manual: '', // BARU
+        // (PERBAIKAN) Ketinggian Bangunan
+        ketinggian_ketentuan_rtr: '',
+        ketinggian_kesesuaian_rtr: 'Sesuai',
         // C.3 KDH
         kdh_luas_tanah: '',
         kdh_perbandingan_vegetasi: '',
         kdh_ketentuan_rtr: '',
         kdh_kesesuaian_rtr: 'Sesuai',
-        kdh_rasio_manual: '',
+        kdh_rasio_manual: '', // BARU
         // C.4 KTB
         ktb_luas_tanah: '',
         ktb_ketentuan_rtr: '',
         ktb_kesesuaian_rtr: 'Sesuai',
-        ktb_rasio_manual: '',
-        ktb_persen_manual: '',
+        ktb_rasio_manual: '', // BARU
+        ktb_persen_manual: '', // BARU
         // C.5 GSB
         gsb_ketentuan_rtr: '',
         gsb_kesesuaian_rtr: 'Sesuai',
@@ -369,7 +253,7 @@ export default function FormulirAnalisisPage() {
     // Handler untuk input numerik
     const handleNumericChange = (e) => {
         const { name, value } = e.target;
-        // Izinkan string kosong, angka, dan satu titik desimal
+        // Regex: izinkan string kosong, angka, dan satu titik desimal
         if (value === '' || /^\d*(\.\d*)?$/.test(value)) {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -436,12 +320,12 @@ export default function FormulirAnalisisPage() {
 
     // --- Render ---
     if (loading) return <div className="text-center py-10">Memuat Formulir Analisis...</div>;
-    if (error && !submitLoading) return <div className="bg-red-100 text-red-700 p-4 rounded-lg">{error}</div>;
+    if (error) return <div className="bg-red-100 text-red-700 p-4 rounded-lg">{error}</div>;
     if (!kasus || !penilaian) return <div className="text-center py-10">Data tidak lengkap.</div>;
 
-    // Opsi dropdown
     const dropdownSesuai = (
         <>
+            <option value="">Pilih...</option>
             <option value="Sesuai">Sesuai</option>
             <option value="Tidak Sesuai">Tidak Sesuai</option>
         </>
@@ -449,12 +333,26 @@ export default function FormulirAnalisisPage() {
 
     const dropdownKtb = (
         <>
+            <option value="">Pilih...</option>
             <option value="Sesuai">Sesuai</option>
             <option value="Tidak Sesuai">Tidak Sesuai</option>
             <option value="Belum Dapat Dinilai">Belum Dapat Dinilai</option>
             <option value="Penilaian Tidak Dapat Dilanjutkan">Penilaian Tidak Dapat Dilanjutkan</option>
         </>
     );
+
+    // (PERBAIKAN Poin 6) Komponen pembungkus input dengan satuan
+    const InputWithUnit = ({ children, unit, className = "" }) => (
+        <div className={`flex items-center gap-2 w-full ${className}`}>
+            <div className="flex-grow min-w-[6rem]">
+                {children}
+            </div>
+            {unit && <span className="text-gray-600 w-8">{unit}</span>}
+        </div>
+    );
+    
+    // (PERBAIKAN Poin 5) Kelas seragam untuk header blok
+    const blockHeaderClass = "bg-gray-100 font-semibold p-2 border-t-2 border-b border-gray-300";
 
     return (
         <div className="bg-gray-100">
@@ -490,7 +388,13 @@ export default function FormulirAnalisisPage() {
                         <div className="overflow-x-auto mt-2">
                             {/* B.1. Lokasi Usaha */}
                             <h4 className="font-semibold mb-2 text-sm">1) Pemeriksaan Lokasi Usaha</h4>
-                            <table className="min-w-full text-sm border-collapse border border-gray-400">
+                            {/* (PERBAIKAN) Menggunakan table-auto dan colgroup */}
+                            <table className="min-w-full text-sm table-auto border-collapse">
+                                <colgroup>
+                                    <col className="w-[37%]" />
+                                    <col className="w-[37%]" />
+                                    <col className="w-[26%]" />
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <TableHeader>Lokasi Usaha berdasarkan PMP UMK</TableHeader>
@@ -500,8 +404,8 @@ export default function FormulirAnalisisPage() {
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <TableCell><div className="w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px] whitespace-pre-wrap">{dataPrefill.lokasi_pmp || '-'}</div></TableCell>
-                                        <TableCell><div className="w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px] whitespace-pre-wrap">{dataPrefill.lokasi_eksisting || '-'}</div></TableCell>
+                                        <TableCell><ReadOnlyInput value={dataPrefill.lokasi_pmp} className="whitespace-pre-wrap" /></TableCell>
+                                        <TableCell><ReadOnlyInput value={dataPrefill.lokasi_eksisting} className="whitespace-pre-wrap" /></TableCell>
                                         <TableCell>
                                             <SelectInput name="lokasi_kesesuaian_pmp_eksisting" value={formData.lokasi_kesesuaian_pmp_eksisting} onChange={handleChange}>
                                                 {dropdownSesuai}
@@ -513,7 +417,15 @@ export default function FormulirAnalisisPage() {
 
                             {/* B.2. Jenis Kegiatan */}
                             <h4 className="font-semibold mt-6 mb-2 text-sm">2) Pemeriksaan Jenis Kegiatan Pemanfaatan Ruang</h4>
-                            <table className="min-w-full text-sm border-collapse border border-gray-400">
+                            {/* (PERBAIKAN) Menggunakan table-auto dan colgroup */}
+                            <table className="min-w-full text-sm table-auto border-collapse">
+                                <colgroup>
+                                    <col className="w-[20%]" />
+                                    <col className="w-[20%]" />
+                                    <col className="w-[20%]" />
+                                    <col className="w-[20%]" />
+                                    <col className="w-[20%]" />
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <TableHeader>Berdasarkan PMP UMK</TableHeader>
@@ -525,8 +437,8 @@ export default function FormulirAnalisisPage() {
                                 </thead>
                                 <tbody>
                                     <tr>
-                                        <TableCell><div className="w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px]">{dataPrefill.jenis_pmp || '-'}</div></TableCell>
-                                        <TableCell><div className="w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px]">{dataPrefill.jenis_eksisting || '-'}</div></TableCell>
+                                        <TableCell><ReadOnlyInput value={dataPrefill.jenis_pmp} /></TableCell>
+                                        <TableCell><ReadOnlyInput value={dataPrefill.jenis_eksisting} /></TableCell>
                                         <TableCell>
                                             <SelectInput name="jenis_kesesuaian_pmp_eksisting" value={formData.jenis_kesesuaian_pmp_eksisting} onChange={handleChange}>
                                                 {dropdownSesuai}
@@ -546,206 +458,494 @@ export default function FormulirAnalisisPage() {
                         </div>
                     </fieldset>
 
-                    {/* C. Pengukuran - Sesuai Juknis */}
+                    {/* C. Pengukuran */}
                     <fieldset className="border p-4 rounded-md">
                         <legend className="text-lg font-semibold px-2">C. Pengukuran</legend>
                         <div className="overflow-x-auto mt-2">
-                            <table className="min-w-full text-sm border-collapse border border-gray-400">
-                                <thead className="text-center">
+                            {/* (PERBAIKAN Poin 1, 7) Menggunakan table-auto dan colgroup baru */}
+                            <table className="min-w-full text-sm table-auto border-collapse">
+                                <colgroup>
+                                    <col className="w-[20%]" /> {/* Komponen */}
+                                    <col className="w-[25%]" /> {/* Sub-Komponen */}
+                                    <col className="w-[18%]" /> {/* Hasil Pengukuran */}
+                                    <col className="w-[17%]" /> {/* Perhitungan (Input Manual) */}
+                                    <col className="w-[10%]" /> {/* Ketentuan RTR */}
+                                    <col className="w-[10%]" /> {/* Hasil Kesesuaian */}
+                                </colgroup>
+                                <thead>
                                     <tr>
-                                        <TableHeader colSpan={2}>Hasil Pemeriksaan dan Pengukuran</TableHeader>
+                                        <TableHeader colSpan={2}>Komponen</TableHeader>
+                                        <TableHeader>Hasil Pemeriksaan & Pengukuran</TableHeader>
+                                        <TableHeader>Perhitungan (Input Manual)</TableHeader>
                                         <TableHeader>Ketentuan RTR</TableHeader>
-                                        <TableHeader>Hasil Kesesuaian dengan RTR (Sesuai/Tidak Sesuai)</TableHeader>
+                                        <TableHeader>Hasil Kesesuaian dgn RTR</TableHeader>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {/* Luas Tanah */}
-                                    <JuknisHeaderRow label="Luas Tanah" />
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen Luas Tanah */}
                                     <tr>
-                                        <JuknisDataRow label="Luas Tanah yang digunakan kegiatan Pemanfaatan Ruang" value={dataPrefill.luas_digunakan} unit="m&sup2;" />
-                                        {/* Kolom RTR & Kesesuaian untuk Luas Tanah (sesuai model, tapi tersembunyi di Juknis) */}
-                                        {/* Sesuai Juknis, kolom ini kosong. Kita biarkan kosong. */}
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            Luas Tanah
+                                        </TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 Luas Tanah (Tanpa rowSpan) */}
                                     <tr>
-                                        <JuknisDataRow label="Luas Tanah yang dikuasai" value={dataPrefill.luas_dikuasai} unit="m&sup2;" />
-                                        {/* Sesuai Juknis, kolom ini kosong. Kita biarkan kosong. */}
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
-                                    </tr>
-
-                                    {/* KDB */}
-                                    <JuknisHeaderRow label="KDB" />
-                                    <tr>
-                                        <JuknisDataRow label="Luas Lantai Dasar Bangunan" value={dataPrefill.kdb_luas_lantai_dasar} unit="m&sup2;" />
-                                        <JuknisRTRCell 
-                                            rtrHeader="KDB"
-                                            rtrName="kdb_ketentuan_rtr"
-                                            rtrValue={formData.kdb_ketentuan_rtr}
-                                            onRtrChange={handleChange}
-                                            rtrPlaceholder=".... %"
-                                            kesesuaianName="kdb_kesesuaian_rtr"
-                                            kesesuaianValue={formData.kdb_kesesuaian_rtr}
-                                            onKesesuaianChange={handleChange}
-                                            rowSpan={4}
-                                        >
-                                            {dropdownSesuai}
-                                        </JuknisRTRCell>
-                                    </tr>
-                                    <tr>
-                                        <JuknisDataRow label="Luas Tanah" value={dataPrefill.luas_dikuasai} unit="m&sup2;" />
-                                    </tr>
-                                    <tr>
-                                        <JuknisCalcRow label="Luas Lantai Dasar Bangunan : Luas Tanah" name="kdb_rasio_manual" value={formData.kdb_rasio_manual} onChange={handleNumericChange} type="text" />
-                                    </tr>
-                                    <tr>
-                                        <JuknisCalcRow label="Perbandingan Luas Lantai Dasar dengan Luas Tanah (x100%)" name="kdb_persen_manual" value={formData.kdb_persen_manual} onChange={handleNumericChange} type="text" unit="%" />
-                                    </tr>
-
-                                    {/* KLB */}
-                                    <JuknisHeaderRow label="KLB" />
-                                    <tr>
-                                        <JuknisDataRow label="Jumlah Lantai Bangunan" value={dataPrefill.klb_jumlah_lantai} unit="lantai" />
-                                        <JuknisRTRCell 
-                                            rtrHeader="KLB"
-                                            rtrName="klb_ketentuan_rtr"
-                                            rtrValue={formData.klb_ketentuan_rtr}
-                                            onRtrChange={handleChange}
-                                            rtrPlaceholder="...."
-                                            kesesuaianName="klb_kesesuaian_rtr"
-                                            kesesuaianValue={formData.klb_kesesuaian_rtr}
-                                            onKesesuaianChange={handleChange}
-                                            rowSpan={4}
-                                        >
-                                            {dropdownSesuai}
-                                        </JuknisRTRCell>
-                                    </tr>
-                                    <tr>
-                                        <JuknisDataRow label="Luas Seluruh Lantai Bangunan" value={dataPrefill.klb_luas_seluruh_lantai} unit="m&sup2;" />
-                                    </tr>
-                                    <tr>
-                                        <JuknisInputRow label="Luas Tanah" name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleNumericChange} type="text" unit="m&sup2;" />
-                                    </tr>
-                                    <tr>
-                                        <JuknisCalcRow label="Luas Seluruh Lantai Bangunan : Luas Tanah" name="klb_rasio_manual" value={formData.klb_rasio_manual} onChange={handleNumericChange} type="text" />
-                                    </tr>
-
-                                    {/* Ketinggian Bangunan */}
-                                    <JuknisHeaderRow label="Ketinggian Bangunan" />
-                                    <tr>
-                                        <JuknisDataRow label="Ketinggian Bangunan" value={dataPrefill.klb_ketinggian} unit="m" />
-                                        {/* Sesuai Juknis, ada input. Tapi tidak ada di Model. Jadi kita disable. */}
+                                        <TableCell className="font-semibold pl-4">Luas Tanah</TableCell>
+                                        <TableCell className="pl-8">Luas Tanah yang digunakan  kegiatan Pemanfaatan Ruang</TableCell>
                                         <TableCell>
-                                            <ManualInput placeholder=".... m" disabled title="Tidak ada field di database" />
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.luas_digunakan} />
+                                            </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
-                                            <SelectInput value="Sesuai" disabled title="Tidak ada field di database">
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} title="Ketentuan RTR Luas Tanah Digunakan" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell><SelectInput name="luas_digunakan_kesesuaian_rtr" value={formData.luas_digunakan_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 2 Luas Tanah (Tanpa rowSpan) */}
+                                    <tr>
+                                        <TableCell></TableCell> {/* Sel Komponen kosong */}
+                                        <TableCell className="pl-8">Luas Tanah yang dikuasai</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.luas_dikuasai} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput name="luas_dikuasai_ketentuan_rtr" value={formData.luas_dikuasai_ketentuan_rtr} onChange={handleChange} title="Ketentuan RTR Luas Tanah Dikuasai"/>
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell><SelectInput name="luas_dikuasai_kesesuaian_rtr" value={formData.luas_dikuasai_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
+                                    </tr>
+
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen KDB */}
+                                    <tr>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            KDB (Koefisien Dasar Bangunan)
+                                        </TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 KDB (Tanpa rowSpan) */}
+                                    <tr>
+                                        <TableCell className="font-semibold pl-4">KDB</TableCell>
+                                        <TableCell className="pl-8">Luas Lantai Dasar Bangunan</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.kdb_luas_lantai_dasar} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="kdb_rasio_manual"
+                                                    value={formData.kdb_rasio_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Rasio (cth: 0.6)"
+                                                    title="Input Manual: Luas Lantai Dasar : Luas Tanah"
+                                                />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="%">
+                                                <ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 60" type="text"/>
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SelectInput name="kdb_kesesuaian_rtr" value={formData.kdb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                        </TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 2 KDB (Tanpa rowSpan) */}
+                                    <tr>
+                                        <TableCell></TableCell> {/* Sel Komponen kosong */}
+                                        <TableCell className="pl-8">Luas Tanah (dikuasai)</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.luas_dikuasai} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="%">
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="kdb_persen_manual"
+                                                    value={formData.kdb_persen_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Persen (cth: 60)"
+                                                    title="Input Manual: Perbandingan (x100%)"
+                                                />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell> {/* Sel Ketentuan kosong */}
+                                        <TableCell></TableCell> {/* Sel Hasil kosong */}
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 3 KDB (Tanpa rowSpan) */}
+                                    <tr>
+                                        <TableCell></TableCell> {/* Sel Komponen kosong */}
+                                        <TableCell className="pl-8 italic">Luas Lantai Dasar : Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell> {/* Sel Perhitungan kosong */}
+                                        <TableCell></TableCell> {/* Sel Ketentuan kosong */}
+                                        <TableCell></TableCell> {/* Sel Hasil kosong */}
+                                    </tr>
+
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen KLB */}
+                                    <tr>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            KLB (Koefisien Lantai Bangunan)
+                                        </TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 KLB */}
+                                    <tr>
+                                        <TableCell className="font-semibold pl-4">KLB</TableCell>
+                                        <TableCell className="pl-8">Jumlah Lantai Bangunan</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="lantai">
+                                                <ReadOnlyInput value={dataPrefill.klb_jumlah_lantai} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="klb_rasio_manual"
+                                                    value={formData.klb_rasio_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Rasio (cth: 1.2)"
+                                                    title="Input Manual: Luas Seluruh Lantai : Luas Tanah"
+                                                />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 1.2" type="text" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SelectInput name="klb_kesesuaian_rtr" value={formData.klb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                        </TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 2 KLB */}
+                                    <tr>
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8">Luas Seluruh Lantai Bangunan</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.klb_luas_seluruh_lantai} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 3 KLB */}
+                                    <tr>
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8">Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 4 KLB */}
+                                    <tr>
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8 italic">Luas Seluruh Lantai : Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                    </tr>
+                                    
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen Ketinggian Bangunan */}
+                                    <tr>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            Ketinggian Bangunan
+                                        </TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 Ketinggian */}
+                                    <tr>
+                                        <TableCell className="font-semibold pl-4">Ketinggian</TableCell>
+                                        <TableCell className="pl-8">Ketinggian Bangunan</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ReadOnlyInput value={dataPrefill.klb_ketinggian} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ManualInput name="ketinggian_ketentuan_rtr" value={formData.ketinggian_ketentuan_rtr} onChange={handleChange} placeholder="cth: 12" type="text" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SelectInput name="ketinggian_kesesuaian_rtr" value={formData.ketinggian_kesesuaian_rtr} onChange={handleChange}>
                                                 {dropdownSesuai}
                                             </SelectInput>
                                         </TableCell>
                                     </tr>
 
-                                    {/* KDH */}
-                                    <JuknisHeaderRow label="KDH" />
+
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen KDH */}
                                     <tr>
-                                        <JuknisDataRow label="Luas Tanah yang Terdapat Vegetasi" value={dataPrefill.kdh_vegetasi} unit="m&sup2;" />
-                                        <JuknisRTRCell 
-                                            rtrHeader="KDH"
-                                            rtrName="kdh_ketentuan_rtr"
-                                            rtrValue={formData.kdh_ketentuan_rtr}
-                                            onRtrChange={handleChange}
-                                            rtrPlaceholder=".... %"
-                                            kesesuaianName="kdh_kesesuaian_rtr"
-                                            kesesuaianValue={formData.kdh_kesesuaian_rtr}
-                                            onKesesuaianChange={handleChange}
-                                            rowSpan={5}
-                                        >
-                                            {dropdownSesuai}
-                                        </JuknisRTRCell>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            KDH (Koefisien Daerah Hijau)
+                                        </TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 KDH */}
                                     <tr>
-                                        <JuknisDataRow label="Luas Tanah yang Tertutup Perkerasan yang masih dapat meresapkan air" value={dataPrefill.kdh_perkerasan} unit="m&sup2;" />
+                                        <TableCell className="font-semibold pl-4">KDH</TableCell>
+                                        <TableCell className="pl-8">Luas Tanah Terdapat Vegetasi</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.kdh_vegetasi} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="kdh_rasio_manual"
+                                                    value={formData.kdh_rasio_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Rasio (cth: 0.2)"
+                                                    title="Input Manual: (Vegetasi + Perkerasan) : Luas Tanah"
+                                                />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="%">
+                                                <ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} placeholder="cth: 20" type="text" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                        </TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 2 KDH */}
                                     <tr>
-                                        <JuknisInputRow label="Luas Tanah" name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleNumericChange} type="text" unit="m&sup2;" />
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8">Luas Tanah Perkerasan (meresap air)</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.kdh_perkerasan} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="%">
+                                                <ManualInput name="kdh_perbandingan_vegetasi" value={formData.kdh_perbandingan_vegetasi} onChange={handleNumericChange} placeholder="Persen (cth: 20)" type="text" title="Input Manual: Perbandingan Vegetasi (x100%)" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 3 KDH */}
                                     <tr>
-                                        <JuknisCalcRow label="Luas Tanah yang Terdapat Vegetasi + Luas Tanah yang Tertutup Perkerasan... : Luas Tanah" name="kdh_rasio_manual" value={formData.kdh_rasio_manual} onChange={handleNumericChange} type="text" />
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8">Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 4 KDH */}
                                     <tr>
-                                        <JuknisCalcRow label="Perbandingan luas tanah terdapat vegetasi dengan Luas Tanah (x100%)" name="kdh_perbandingan_vegetasi" value={formData.kdh_perbandingan_vegetasi} onChange={handleNumericChange} type="text" unit="%" />
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8 italic">(Vegetasi + Perkerasan) : Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
                                     </tr>
 
-                                    {/* KTB */}
-                                    <JuknisHeaderRow label="Koefisien Tapak Basemen (KTB)" />
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen KTB */}
                                     <tr>
-                                        <JuknisDataRow label="Luas Basemen" value={dataPrefill.ktb_luas_basemen} unit="m&sup2;" />
-                                        <JuknisRTRCell 
-                                            rtrHeader="KTB"
-                                            rtrName="ktb_ketentuan_rtr"
-                                            rtrValue={formData.ktb_ketentuan_rtr}
-                                            onRtrChange={handleChange}
-                                            rtrPlaceholder=".... %"
-                                            kesesuaianName="ktb_kesesuaian_rtr"
-                                            kesesuaianValue={formData.ktb_kesesuaian_rtr}
-                                            onKesesuaianChange={handleChange}
-                                            rowSpan={4}
-                                        >
-                                            {dropdownKtb}
-                                        </JuknisRTRCell>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            KTB (Koefisien Tapak Basemen)
+                                        </TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 KTB */}
                                     <tr>
-                                        <JuknisInputRow label="Luas Tanah" name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleNumericChange} type="text" unit="m&sup2;" />
+                                        <TableCell className="font-semibold pl-4">KTB</TableCell>
+                                        <TableCell className="pl-8">Luas Basemen</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ReadOnlyInput value={dataPrefill.ktb_luas_basemen} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="ktb_rasio_manual"
+                                                    value={formData.ktb_rasio_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Rasio (cth: 0.3)"
+                                                    title="Input Manual: Luas Basemen : Luas Tanah"
+                                                />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="%">
+                                                <ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 30" type="text" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange}>{dropdownKtb}</SelectInput>
+                                        </TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 2 KTB */}
                                     <tr>
-                                        <JuknisCalcRow label="Luas Basemen dibagi luas tanah" name="ktb_rasio_manual" value={formData.ktb_rasio_manual} onChange={handleNumericChange} type="text" />
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8">Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m²">
+                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="%">
+                                                <ManualInput 
+                                                    type="text"
+                                                    name="ktb_persen_manual"
+                                                    value={formData.ktb_persen_manual}
+                                                    onChange={handleNumericChange}
+                                                    placeholder="Persen (cth: 30)"
+                                                    title="Input Manual: Perbandingan (x100%)"
+                                                />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 3 KTB */}
                                     <tr>
-                                        <JuknisCalcRow label="Perbandingan Luas Basemen dengan luas tanah (x100%)" name="ktb_persen_manual" value={formData.ktb_persen_manual} onChange={handleNumericChange} type="text" unit="%" />
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8 italic">Luas Basemen : Luas Tanah</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell></TableCell>
                                     </tr>
 
-                                    {/* GSB */}
-                                    <JuknisHeaderRow label="Garis Sempadan Bangunan (GSB)" />
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen GSB */}
                                     <tr>
-                                        <JuknisDataRow label="Jarak Bangunan Terdepan dengan Pagar" value={dataPrefill.gsb_jarak} unit="m" />
-                                        <JuknisRTRCell 
-                                            rtrHeader="GSB"
-                                            rtrName="gsb_ketentuan_rtr"
-                                            rtrValue={formData.gsb_ketentuan_rtr}
-                                            onRtrChange={handleChange}
-                                            rtrPlaceholder=".... m"
-                                            kesesuaianName="gsb_kesesuaian_rtr"
-                                            kesesuaianValue={formData.gsb_kesesuaian_rtr}
-                                            onKesesuaianChange={handleChange}
-                                            rowSpan={1}
-                                        >
-                                            {dropdownSesuai}
-                                        </JuknisRTRCell>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            GSB (Garis Sempadan Bangunan)
+                                        </TableCell>
+                                    </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 GSB */}
+                                    <tr>
+                                        <TableCell className="font-semibold pl-4">GSB</TableCell>
+                                        <TableCell className="pl-8">Jarak Bangunan Terdepan dgn Pagar</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ReadOnlyInput value={dataPrefill.gsb_jarak} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ManualInput name="gsb_ketentuan_rtr" value={formData.gsb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 5" type="text" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell><SelectInput name="gsb_kesesuaian_rtr" value={formData.gsb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
                                     </tr>
 
-                                    {/* JBB */}
-                                    <JuknisHeaderRow label="Jarak Bebas Bangunan (JBB)" />
+                                    {/* (PERBAIKAN Poin 2, 5) Header Komponen JBB */}
                                     <tr>
-                                        <JuknisDataRow label="Jarak Bangunan (Batas Petak Belakang)" value={dataPrefill.jbb_belakang} unit="m" />
-                                        <JuknisRTRCell 
-                                            rtrHeader="JBB"
-                                            rtrName="jbb_ketentuan_rtr"
-                                            rtrValue={formData.jbb_ketentuan_rtr}
-                                            onRtrChange={handleChange}
-                                            rtrPlaceholder=".... m"
-                                            kesesuaianName="jbb_kesesuaian_rtr"
-                                            kesesuaianValue={formData.jbb_kesesuaian_rtr}
-                                            onKesesuaianChange={handleChange}
-                                            rowSpan={2}
-                                        >
-                                            {dropdownSesuai}
-                                        </JuknisRTRCell>
+                                        <TableCell colSpan={6} className={blockHeaderClass}>
+                                            JBB (Jarak Bebas Bangunan)
+                                        </TableCell>
                                     </tr>
+                                    {/* (PERBAIKAN Poin 2) Baris 1 JBB */}
                                     <tr>
-                                        <JuknisDataRow label="Jarak Bangunan (Batas Petak Samping)" value={dataPrefill.jbb_samping} unit="m" />
+                                        <TableCell className="font-semibold pl-4">JBB</TableCell>
+                                        <TableCell className="pl-8">Jarak Bangunan (Batas Petak Belakang)</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ReadOnlyInput value={dataPrefill.jbb_belakang} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ManualInput name="jbb_ketentuan_rtr" value={formData.jbb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 3" type="text" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SelectInput name="jbb_kesesuaian_rtr" value={formData.jbb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                        </TableCell>
                                     </tr>
-
+                                    {/* (PERBAIKAN Poin 2) Baris 2 JBB */}
+                                    <tr>
+                                        <TableCell></TableCell>
+                                        <TableCell className="pl-8">Jarak Bangunan (Batas Petak Samping)</TableCell>
+                                        <TableCell>
+                                            <InputWithUnit unit="m">
+                                                <ReadOnlyInput value={dataPrefill.jbb_samping} />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                            <InputWithUnit>
+                                                <ReadOnlyInput value="-" />
+                                            </InputWithUnit>
+                                        </TableCell>
+                                        <TableCell>
+                                             {/* Sel ini sengaja dikosongkan agar sejajar dengan baris JBB pertama */}
+                                        </TableCell>
+                                        <TableCell>
+                                             {/* Sel ini sengaja dikosongkan agar sejajar dengan baris JBB pertama */}
+                                        </TableCell>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
