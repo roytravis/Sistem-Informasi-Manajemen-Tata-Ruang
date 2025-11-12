@@ -27,15 +27,19 @@ const ReadOnlyInput = ({ value, className = "" }) => (
 );
 
 // (PERBAIKAN Poin 6) Tambahkan text-right jika numerik
+// SOLUSI 1: Tambahkan dir="ltr" dan style text-align
 const ManualInput = ({ name, value, onChange, placeholder = "", type = "text", title = "", className = "" }) => (
     <input
+        dir="ltr" // Memaksa input menjadi LTR
         type={type}
         name={name}
         value={value || ''}
         onChange={onChange}
         placeholder={placeholder}
         title={title} // Menambahkan tooltip
-        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${type === 'text' && (name.includes('rasio') || name.includes('persen') || name.includes('luas') || name.includes('manual') || name.includes('ketentuan')) ? 'text-right' : ''} ${className}`}
+        // Tentukan perataan teks: kanan untuk numerik, kiri untuk teks
+        style={{ textAlign: (name.includes('rasio') || name.includes('manual') || name.includes('luas_tanah')) ? 'right' : 'left' }}
+        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`} // Logika text-right dihapus dari sini
     />
 );
 
@@ -253,17 +257,26 @@ export default function FormulirAnalisisPage() {
         };
     }, [penilaian, kasus]);
     
-    // Handler untuk perubahan input form manual
+    // SOLUSI 2: Gabungkan handler dan revisi logika validasi
+    // Handler gabungan untuk semua input manual (teks dan numerik)
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+        
+        // Tentukan field mana yang HARUS numerik
+        // Ini mencakup field rasio, persentase manual, dan input luas tanah
+        const numericKeywords = ['rasio', 'manual', 'luas_tanah'];
+        const isNumericField = numericKeywords.some(keyword => name.includes(keyword));
 
-    // (PERBAIKAN Poin 5) Handler untuk input numerik
-    const handleNumericChange = (e) => {
-        const { name, value } = e.target;
-        if (/^[0-9]*([.,][0-9]*)?$/.test(value) || value === '') {
-            setFormData(prev => ({ ...prev, [name]: value.replace(',', '.') }));
+        if (isNumericField) {
+            // Jika ini field numerik, terapkan validasi regex
+            if (/^[0-9]*([.,][0-9]*)?$/.test(value) || value === '') {
+                // Hanya izinkan angka, titik, atau koma (diganti titik)
+                setFormData(prev => ({ ...prev, [name]: value.replace(',', '.') }));
+            }
+            // Jika input tidak valid (misal: "12a"), input diabaikan (tidak memanggil setFormData)
+        } else {
+            // Jika ini field teks biasa (seperti 'jenis_ketentuan_rtr'), izinkan input apapun
+            setFormData(prev => ({ ...prev, [name]: value }));
         }
     };
     
@@ -582,11 +595,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Lantai Dasar : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="kdb_luas_lantai_dasar_rasio"
                                                     value={formData.kdb_luas_lantai_dasar_rasio}
-                                                    onChange={handleNumericChange}
+                                                    onChange={handleChange}
                                                     placeholder="Rasio (cth: 0.6)"
                                                     title="Input Manual: Luas Lantai Dasar : Luas Tanah"
                                                 />
@@ -601,11 +615,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Perbandingan Luas Lantai Dasar dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
                                                 <ManualInput
                                                     type="text"
                                                     name="kdb_perbandingan_manual"
                                                     value={formData.kdb_perbandingan_manual}
-                                                    onChange={handleNumericChange}
+                                                    onChange={handleChange}
                                                     placeholder="cth: 60"
                                                     title="Input Manual: Perbandingan (x100%)"
                                                 />
@@ -658,7 +673,8 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
@@ -670,11 +686,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Seluruh Lantai : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="klb_luas_seluruh_lantai_rasio"
                                                     value={formData.klb_luas_seluruh_lantai_rasio}
-                                                    onChange={handleNumericChange}
+                                                    onChange={handleChange}
                                                     placeholder="Rasio (cth: 1.2)"
                                                     title="Input Manual: Luas Seluruh Lantai : Luas Tanah"
                                                 />
@@ -754,7 +771,8 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
@@ -766,11 +784,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">(Vegetasi + Perkerasan) : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="kdh_rasio_manual"
                                                     value={formData.kdh_rasio_manual}
-                                                    onChange={handleNumericChange}
+                                                    onChange={handleChange}
                                                     placeholder="Rasio (cth: 0.2)"
                                                     title="Input Manual: (Vegetasi + Perkerasan) : Luas Tanah"
                                                 />
@@ -785,7 +804,8 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Perbandingan luas tanah terdapat Vegetasi dgn Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="kdh_perbandingan_manual" value={formData.kdh_perbandingan_manual} onChange={handleNumericChange} placeholder="Persen (cth: 20)" type="text" title="Input Manual: Perbandingan Vegetasi (x100%)" />
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                <ManualInput name="kdh_perbandingan_manual" value={formData.kdh_perbandingan_manual} onChange={handleChange} placeholder="Persen (cth: 20)" type="text" title="Input Manual: Perbandingan Vegetasi (x100%)" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
@@ -823,7 +843,8 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleNumericChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
@@ -835,11 +856,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Basemen : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="ktb_luas_basemen_rasio"
                                                     value={formData.ktb_luas_basemen_rasio}
-                                                    onChange={handleNumericChange}
+                                                    onChange={handleChange}
                                                     placeholder="Rasio (cth: 0.3)"
                                                     title="Input Manual: Luas Basemen : Luas Tanah"
                                                 />
@@ -854,11 +876,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Perbandingan Luas Basemen dengan luas tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
+                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="ktb_perbandingan_manual"
                                                     value={formData.ktb_perbandingan_manual}
-                                                    onChange={handleNumericChange}
+                                                    onChange={handleChange}
                                                     placeholder="Persen (cth: 30)"
                                                     title="Input Manual: Perbandingan (x100%)"
                                                 />
