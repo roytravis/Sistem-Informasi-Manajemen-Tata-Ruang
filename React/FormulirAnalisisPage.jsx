@@ -1,63 +1,88 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import api from '../api/axios.js'; // PERBAIKAN: Path disesuaikan ke root
 import SignatureCanvas from 'react-signature-canvas';
 import { useAuth } from '../context/AuthContext';
 
 // --- Komponen-komponen Reusable ---
 
-// (PERBAIKAN Poin 3) Padding seragam dan align-middle
-const TableHeader = ({ children, colSpan = 1, rowSpan = 1, className = "" }) => (
+// (SOLUSI) Memoize semua komponen reusable untuk mencegah re-render yang tidak perlu
+const TableHeader = memo(({ children, colSpan = 1, rowSpan = 1, className = "" }) => (
     <th className={`py-2 px-3 border border-gray-300 bg-gray-100 font-semibold align-middle ${className}`} colSpan={colSpan} rowSpan={rowSpan}>
         {children}
     </th>
-);
+));
 
-// (PERBAIKAN Poin 3) Padding seragam dan align-middle
-const TableCell = ({ children, className = "" }) => (
+const TableCell = memo(({ children, className = "" }) => (
     <td className={`py-2 px-3 border border-gray-300 align-middle ${className}`}>
         {children}
     </td>
-);
+));
 
-const ReadOnlyInput = ({ value, className = "" }) => (
+const ReadOnlyInput = memo(({ value, className = "" }) => (
     <div className={`w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px] flex items-center ${className}`}>
         {value || '-'}
     </div>
-);
+));
 
-// (PERBAIKAN Poin 6) Tambahkan text-right jika numerik
-// SOLUSI 1: Tambahkan dir="ltr" dan style text-align
-const ManualInput = ({ name, value, onChange, placeholder = "", type = "text", title = "", className = "" }) => (
+const ManualInput = memo(({ name, value, onChange, onBlur, placeholder = "", type = "text", title = "", className = "" }) => (
     <input
         dir="ltr" // Memaksa input menjadi LTR
         type={type}
         name={name}
-        value={value || ''}
+        value={value ?? ''}
         onChange={onChange}
+        onBlur={onBlur} // Menambahkan onBlur handler
         placeholder={placeholder}
         title={title} // Menambahkan tooltip
-        // Tentukan perataan teks: kanan untuk numerik, kiri untuk teks
-        style={{ textAlign: (name.includes('rasio') || name.includes('manual') || name.includes('luas_tanah')) ? 'right' : 'left' }}
-        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`} // Logika text-right dihapus dari sini
+        style={{ textAlign: 'left' }}
+        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`}
     />
-);
+));
 
-const SelectInput = ({ name, value, onChange, children, className = "" }) => (
+const SelectInput = memo(({ name, value, onChange, children, className = "" }) => (
     <select
         name={name}
-        value={value || ''}
+        value={value ?? ''}
         onChange={onChange}
         className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`}
     >
         {children}
     </select>
-);
+));
 
-// Komponen Tanda Tangan (Mirip PenilaianDetailPage)
-const PetugasPenilaiSignature = ({ member, signaturePath, signatureRef }) => {
+// (PERBAIKAN Poin 6 & SOLUSI BUG FOKUS)
+// Komponen ini harus didefinisikan di luar render function
+// dan dibungkus dengan memo() untuk mencegah re-render yang tidak perlu.
+const InputWithUnit = memo(({ children, unit, className = "" }) => (
+    <div className={`flex items-center gap-2 w-full ${className}`}>
+        {/* Tambahkan flex-shrink-0 agar div input tidak 'mengecil' saat diketik */}
+        <div className="flex-grow min-w-[6rem] flex-shrink-0">
+            {children}
+        </div>
+        {/* Tambahkan flex-shrink-0 agar span satuan tidak 'mengecil' */}
+        {unit && <span className="text-gray-600 w-8 flex-shrink-0">{unit}</span>}
+    </div>
+));
+
+// (SOLUSI) Memoize dan perbaiki penanganan ref untuk menghindari inline callback
+const PetugasPenilaiSignature = memo(({ member, signaturePath, signatureRefs, memberId }) => {
     const baseUrl = api.defaults.baseURL;
     const imageUrl = signaturePath ? `${baseUrl}/signatures/${signaturePath}?t=${new Date().getTime()}` : null;
+
+    // Buat callback yang stabil untuk ref canvas
+    const setCanvasRef = useCallback(el => {
+        if (signatureRefs) {
+            signatureRefs.current[memberId] = el;
+        }
+    }, [signatureRefs, memberId]);
+
+    // Buat callback yang stabil untuk tombol clear
+    const handleClear = useCallback(() => {
+        if (signatureRefs?.current[memberId]) {
+            signatureRefs.current[memberId].clear();
+        }
+    }, [signatureRefs, memberId]);
     
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 border rounded-md signature-block">
@@ -86,13 +111,45 @@ const PetugasPenilaiSignature = ({ member, signaturePath, signatureRef }) => {
                 {/* 2. Canvas Tanda Tangan */}
                 <div className='signature-canvas-container'>
                     <div className="border border-gray-300 rounded-md bg-white">
-                        <SignatureCanvas ref={signatureRef} penColor='black' canvasProps={{className: 'w-full h-20'}} />
+                        {/* Gunakan ref callback yang stabil */}
+                        <SignatureCanvas ref={setCanvasRef} penColor='black' canvasProps={{className: 'w-full h-20'}} />
                     </div>
-                    <button type="button" onClick={() => signatureRef?.clear()} className="text-sm text-blue-600 hover:underline mt-1 no-print">Ulangi</button>
+                    {/* Gunakan handler klik yang stabil */}
+                    <button type="button" onClick={handleClear} className="text-sm text-blue-600 hover:underline mt-1 no-print">Ulangi</button>
                 </div>
             </div>
         </div>
     );
+});
+
+// (SOLUSI 3) Fungsi sanitasi numerik, dipanggil hanya saat submit
+const sanitizeNumericValue = (value) => {
+    // Jika null, undefined, atau bukan string, kembalikan string kosong atau nilai aslinya
+    if (typeof value !== 'string' || !value) {
+        // Pastikan null/undefined menjadi string kosong
+        // Perbaikan: Gunakan '??' untuk menyederhanakan
+        return value ?? ''; 
+    }
+    
+    // 1. Hapus semua karakter yang BUKAN angka, titik, atau koma.
+    const filtered = value.replace(/[^0-9.,]/g, '');
+    
+    // 2. Ganti SEMUA koma (,) menjadi titik (.).
+    const dotsOnly = filtered.replace(/,/g, '.');
+
+    // 3. Pastikan hanya ada SATU titik desimal.
+    //    Misal: "1.5.5" -> "1.55" | "1..5" -> "1.5"
+    const parts = dotsOnly.split('.');
+    let finalValue = parts.shift(); // Ambil bagian pertama (sebelum titik pertama)
+    
+    if (parts.length > 0) {
+        // Jika ada bagian setelah titik, gabungkan sisa bagiannya.
+        // Ini juga menangani "1." -> ["1", ""] -> "1" + "." + "" = "1."
+        finalValue += '.' + parts.join(''); 
+    }
+
+    // Logika ini tidak akan mengubah "1." menjadi "1", sesuai permintaan.
+    return finalValue;
 };
 
 
@@ -176,15 +233,34 @@ export default function FormulirAnalisisPage() {
                         // Jika ada, isi formData dengan data yang tersimpan
                         setFormData(prev => ({
                             ...prev,
-                            ...analisisRes.data,
-                            // (PERBAIKAN) Menyesuaikan state yang di-load
-                            kdb_luas_lantai_dasar_rasio: analisisRes.data.kdb_rasio_manual || '',
-                            kdb_perbandingan_manual: analisisRes.data.kdb_persen_manual || '',
-                            klb_luas_seluruh_lantai_rasio: analisisRes.data.klb_rasio_manual || '',
-                            kdh_rasio_manual: analisisRes.data.kdh_rasio_manual || '',
-                            kdh_perbandingan_manual: analisisRes.data.kdh_perbandingan_vegetasi || '',
-                            ktb_luas_basemen_rasio: analisisRes.data.ktb_rasio_manual || '',
-                            ktb_perbandingan_manual: analisisRes.data.ktb_persen_manual || '',
+                            ...analisisRes.data, // Spread original data
+
+                            // (SOLUSI) Paksa semua field numerik (terutama ketentuan) menjadi string
+                            // Ini untuk mencegah bug controlled input di mana 'null' menyebabkan input menolak digit kedua
+                            kdb_ketentuan_rtr: String(analisisRes.data.kdb_ketentuan_rtr ?? ''),
+                            klb_ketentuan_rtr: String(analisisRes.data.klb_ketentuan_rtr ?? ''),
+                            kdh_ketentuan_rtr: String(analisisRes.data.kdh_ketentuan_rtr ?? ''),
+                            ktb_ketentuan_rtr: String(analisisRes.data.ktb_ketentuan_rtr ?? ''),
+                            gsb_ketentuan_rtr: String(analisisRes.data.gsb_ketentuan_rtr ?? ''),
+                            jbb_ketentuan_rtr: String(analisisRes.data.jbb_ketentuan_rtr ?? ''),
+                            ketinggian_ketentuan_rtr: String(analisisRes.data.ketinggian_ketentuan_rtr ?? ''),
+                            luas_digunakan_ketentuan_rtr: String(analisisRes.data.luas_digunakan_ketentuan_rtr ?? ''),
+                            luas_dikuasai_ketentuan_rtr: String(analisisRes.data.luas_dikuasai_ketentuan_rtr ?? ''),
+                            
+                            // Input numerik manual lainnya
+                            klb_luas_tanah: String(analisisRes.data.klb_luas_tanah ?? ''),
+                            kdh_luas_tanah: String(analisisRes.data.kdh_luas_tanah ?? ''),
+                            ktb_luas_tanah: String(analisisRes.data.ktb_luas_tanah ?? ''),
+
+                            // (PERBAIKAN) Menyesuaikan state yang di-load dan juga paksa ke string
+                            kdb_luas_lantai_dasar_rasio: String(analisisRes.data.kdb_rasio_manual ?? ''),
+                            kdb_perbandingan_manual: String(analisisRes.data.kdb_persen_manual ?? ''),
+                            klb_luas_seluruh_lantai_rasio: String(analisisRes.data.klb_rasio_manual ?? ''),
+                            kdh_rasio_manual: String(analisisRes.data.kdh_rasio_manual ?? ''),
+                            kdh_perbandingan_manual: String(analisisRes.data.kdh_perbandingan_vegetasi ?? ''),
+                            ktb_luas_basemen_rasio: String(analisisRes.data.ktb_rasio_manual ?? ''),
+                            ktb_perbandingan_manual: String(analisisRes.data.ktb_persen_manual ?? ''),
+                            
                             // Pastikan ttd disimpan sebagai path
                             tanda_tangan_tim: (analisisRes.data.tanda_tangan_tim || []).map(sig => ({
                                 user_id: sig.user_id,
@@ -257,28 +333,18 @@ export default function FormulirAnalisisPage() {
         };
     }, [penilaian, kasus]);
     
-    // SOLUSI 2: Gabungkan handler dan revisi logika validasi
-    // Handler gabungan untuk semua input manual (teks dan numerik)
-    const handleChange = (e) => {
+    // (SOLUSI) Bungkus handleChange dengan useCallback agar referensinya stabil
+    const handleChange = useCallback((e) => {
         const { name, value } = e.target;
-        
-        // Tentukan field mana yang HARUS numerik
-        // Ini mencakup field rasio, persentase manual, dan input luas tanah
-        const numericKeywords = ['rasio', 'manual', 'luas_tanah'];
-        const isNumericField = numericKeywords.some(keyword => name.includes(keyword));
+        // Langsung update state apa adanya.
+        // Sanitasi akan dilakukan di handleSubmit.
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }, []); // Dependency array kosong karena setFormData dijamin stabil
 
-        if (isNumericField) {
-            // Jika ini field numerik, terapkan validasi regex
-            if (/^[0-9]*([.,][0-9]*)?$/.test(value) || value === '') {
-                // Hanya izinkan angka, titik, atau koma (diganti titik)
-                setFormData(prev => ({ ...prev, [name]: value.replace(',', '.') }));
-            }
-            // Jika input tidak valid (misal: "12a"), input diabaikan (tidak memanggil setFormData)
-        } else {
-            // Jika ini field teks biasa (seperti 'jenis_ketentuan_rtr'), izinkan input apapun
-            setFormData(prev => ({ ...prev, [name]: value }));
-        }
-    };
+    // (SOLUSI) Bungkus handleBlur dengan useCallback agar referensinya stabil
+    const handleBlur = useCallback((e) => {
+        // Tidak melakukan apa-apa.
+    }, []); // Dependency array kosong
     
     // Tim Penilai (Petugas Lapangan, Koordinator, Ketua Tim)
     const timPenilai = useMemo(() => {
@@ -293,12 +359,36 @@ export default function FormulirAnalisisPage() {
         setSubmitLoading(true);
         setError('');
 
+        // (SOLUSI 3) Lakukan sanitasi data TEPAT SEBELUM submit
+        const sanitizedFormData = { ...formData };
+        const numericKeywords = ['rasio', 'manual', 'luas_tanah', 'ketentuan_rtr'];
+        
+        for (const key in sanitizedFormData) {
+            // Pengecualian: 'jenis_ketentuan_rtr' adalah field teks, jangan disanitasi
+            if (key === 'jenis_ketentuan_rtr') {
+                continue;
+            }
+
+            // Cek apakah key mengandung salah satu keyword numerik
+            const isNumericField = numericKeywords.some(keyword => key.includes(keyword));
+            
+            if (isNumericField) {
+                sanitizedFormData[key] = sanitizeNumericValue(sanitizedFormData[key]);
+            }
+        }
+        
+        // Update state agar UI konsisten dengan data yang akan disimpan
+        // Ini juga memastikan jika submit gagal, user melihat data yang bersih
+        setFormData(sanitizedFormData);
+
+
         const signatureData = [];
         let allSigned = true;
 
         for (const member of timPenilai) {
             const sigCanvas = signatureRefs.current[member.id];
             const isCanvasEmpty = !sigCanvas || sigCanvas.isEmpty();
+            // Cek signaturePath dari formData (sudah aman, ttd tdk akan tersanitasi)
             const existingSignature = formData.tanda_tangan_tim.find(sig => sig.user_id === member.id);
 
             if (isCanvasEmpty && !existingSignature) {
@@ -327,20 +417,22 @@ export default function FormulirAnalisisPage() {
         }
         
         // (PERBAIKAN) Menyesuaikan payload dengan nama state baru
+        // PENTING: Gunakan 'sanitizedFormData' untuk payload
         const payload = {
-            ...formData,
-            kdb_rasio_manual: formData.kdb_luas_lantai_dasar_rasio,
-            kdb_persen_manual: formData.kdb_perbandingan_manual,
-            klb_rasio_manual: formData.klb_luas_seluruh_lantai_rasio,
-            kdh_rasio_manual: formData.kdh_rasio_manual,
-            kdh_perbandingan_vegetasi: formData.kdh_perbandingan_manual,
-            ktb_rasio_manual: formData.ktb_luas_basemen_rasio,
-            ktb_persen_manual: formData.ktb_perbandingan_manual,
+            ...sanitizedFormData,
+            kdb_rasio_manual: sanitizedFormData.kdb_luas_lantai_dasar_rasio,
+            kdb_persen_manual: sanitizedFormData.kdb_perbandingan_manual,
+            klb_rasio_manual: sanitizedFormData.klb_luas_seluruh_lantai_rasio,
+            kdh_rasio_manual: sanitizedFormData.kdh_rasio_manual,
+            kdh_perbandingan_vegetasi: sanitizedFormData.kdh_perbandingan_manual,
+            ktb_rasio_manual: sanitizedFormData.ktb_luas_basemen_rasio,
+            ktb_persen_manual: sanitizedFormData.ktb_perbandingan_manual,
             tanda_tangan_tim: signatureData
         };
 
         try {
             await api.post(`/formulir-analisis/${penilaian.id}`, payload);
+            // Gunakan alert standar browser
             alert('Formulir Analisis berhasil disimpan!');
             navigate(`/penilaian`); // Kembali ke dashboard
         } catch (err) {
@@ -373,16 +465,6 @@ export default function FormulirAnalisisPage() {
         </>
     );
 
-    // (PERBAIKAN Poin 6) Komponen pembungkus input dengan satuan
-    const InputWithUnit = ({ children, unit, className = "" }) => (
-        <div className={`flex items-center gap-2 w-full ${className}`}>
-            <div className="flex-grow min-w-[6rem]">
-                {children}
-            </div>
-            {unit && <span className="text-gray-600 w-8">{unit}</span>}
-        </div>
-    );
-    
     // (PERBAIKAN Poin 5) Kelas seragam untuk header blok
     const blockHeaderClass = "bg-gray-100 font-semibold p-2 border-t-2 border-b border-gray-300";
 
@@ -477,7 +559,8 @@ export default function FormulirAnalisisPage() {
                                             </SelectInput>
                                         </TableCell>
                                         <TableCell>
-                                            <ManualInput name="jenis_ketentuan_rtr" value={formData.jenis_ketentuan_rtr} onChange={handleChange} placeholder="Input ketentuan RTR..." />
+                                            {/* PERBAIKAN: Menambahkan onBlur */}
+                                            <ManualInput name="jenis_ketentuan_rtr" value={formData.jenis_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="Input ketentuan RTR..." />
                                         </TableCell>
                                         <TableCell>
                                             <SelectInput name="jenis_kesesuaian_rtr" value={formData.jenis_kesesuaian_rtr} onChange={handleChange}>
@@ -531,7 +614,8 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} title="Ketentuan RTR Luas Tanah Digunakan" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah Digunakan" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell><SelectInput name="luas_digunakan_kesesuaian_rtr" value={formData.luas_digunakan_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
@@ -547,7 +631,8 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                <ManualInput name="luas_dikuasai_ketentuan_rtr" value={formData.luas_dikuasai_ketentuan_rtr} onChange={handleChange} title="Ketentuan RTR Luas Tanah Dikuasai"/>
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="luas_dikuasai_ketentuan_rtr" value={formData.luas_dikuasai_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah Dikuasai"/>
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell><SelectInput name="luas_dikuasai_kesesuaian_rtr" value={formData.luas_dikuasai_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
@@ -570,7 +655,8 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 60" type="text"/>
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 60" type="text"/>
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
@@ -595,12 +681,13 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Lantai Dasar : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="kdb_luas_lantai_dasar_rasio"
                                                     value={formData.kdb_luas_lantai_dasar_rasio}
                                                     onChange={handleChange}
+                                                    onBlur={handleBlur}
                                                     placeholder="Rasio (cth: 0.6)"
                                                     title="Input Manual: Luas Lantai Dasar : Luas Tanah"
                                                 />
@@ -615,12 +702,13 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Perbandingan Luas Lantai Dasar dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput
                                                     type="text"
                                                     name="kdb_perbandingan_manual"
                                                     value={formData.kdb_perbandingan_manual}
                                                     onChange={handleChange}
+                                                    onBlur={handleBlur}
                                                     placeholder="cth: 60"
                                                     title="Input Manual: Perbandingan (x100%)"
                                                 />
@@ -648,7 +736,8 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                <ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 1.2" type="text" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 1.2" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
@@ -673,8 +762,8 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
-                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
@@ -686,12 +775,13 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Seluruh Lantai : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="klb_luas_seluruh_lantai_rasio"
                                                     value={formData.klb_luas_seluruh_lantai_rasio}
                                                     onChange={handleChange}
+                                                    onBlur={handleBlur}
                                                     placeholder="Rasio (cth: 1.2)"
                                                     title="Input Manual: Luas Seluruh Lantai : Luas Tanah"
                                                 />
@@ -718,16 +808,14 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
-                                                <ManualInput name="ketinggian_ketentuan_rtr" value={formData.ketinggian_ketentuan_rtr} onChange={handleChange} placeholder="cth: 12" type="text" />
+                                                {/* PERBAIKAN: Menambahkan onBlur dan memperbaiki name prop */}
+                                                <ManualInput name="ketinggian_ketentuan_rtr" value={formData.ketinggian_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 8" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
-                                            <SelectInput name="ketinggian_kesesuaian_rtr" value={formData.ketinggian_kesesuaian_rtr} onChange={handleChange}>
-                                                {dropdownSesuai}
-                                            </SelectInput>
+                                            <SelectInput name="ketinggian_kesesuaian_rtr" value={formData.ketinggian_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
-
 
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen KDH */}
                                     <tr>
@@ -735,10 +823,9 @@ export default function FormulirAnalisisPage() {
                                             KDH (Koefisien Daerah Hijau)
                                         </TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 1 KDH */}
                                     <tr>
                                         <TableCell className="font-semibold pl-4">KDH</TableCell>
-                                        <TableCell className="pl-8">Luas Tanah Terdapat Vegetasi</TableCell>
+                                        <TableCell className="pl-8">Luas Vegetasi</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.kdh_vegetasi} />
@@ -746,17 +833,17 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} placeholder="cth: 20" type="text" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 20" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
                                             <SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 2 KDH */}
                                     <tr>
                                         <TableCell></TableCell>
-                                        <TableCell className="pl-8">Luas Tanah Perkerasan (meresap air)</TableCell>
+                                        <TableCell className="pl-8">Luas Perkerasan</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.kdh_perkerasan} />
@@ -765,53 +852,58 @@ export default function FormulirAnalisisPage() {
                                         <TableCell></TableCell>
                                         <TableCell></TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 3 KDH */}
                                     <tr>
                                         <TableCell></TableCell>
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
-                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
                                         <TableCell></TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 4 KDH */}
                                     <tr>
                                         <TableCell></TableCell>
-                                        <TableCell className="pl-8 italic">(Vegetasi + Perkerasan) : Luas Tanah</TableCell>
+                                        <TableCell className="pl-8 italic">Luas Vegetasi : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="kdh_rasio_manual"
                                                     value={formData.kdh_rasio_manual}
                                                     onChange={handleChange}
+                                                    onBlur={handleBlur}
                                                     placeholder="Rasio (cth: 0.2)"
-                                                    title="Input Manual: (Vegetasi + Perkerasan) : Luas Tanah"
+                                                    title="Input Manual: Luas Vegetasi : Luas Tanah"
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
                                         <TableCell></TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 2) Baris 5 KDH (Baru) */}
                                     <tr>
                                         <TableCell></TableCell>
-                                        <TableCell className="pl-8">Perbandingan luas tanah terdapat Vegetasi dgn Luas Tanah (x100%)</TableCell>
+                                        <TableCell className="pl-8">Perbandingan Luas Vegetasi dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
-                                                <ManualInput name="kdh_perbandingan_manual" value={formData.kdh_perbandingan_manual} onChange={handleChange} placeholder="Persen (cth: 20)" type="text" title="Input Manual: Perbandingan Vegetasi (x100%)" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput
+                                                    type="text"
+                                                    name="kdh_perbandingan_manual"
+                                                    value={formData.kdh_perbandingan_manual}
+                                                    onChange={handleChange}
+                                                    onBlur={handleBlur}
+                                                    placeholder="cth: 20"
+                                                    title="Input Manual: Perbandingan (x100%)"
+                                                />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
                                         <TableCell></TableCell>
                                     </tr>
-
 
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen KTB */}
                                     <tr>
@@ -819,10 +911,9 @@ export default function FormulirAnalisisPage() {
                                             KTB (Koefisien Tapak Basemen)
                                         </TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 1 KTB */}
                                     <tr>
                                         <TableCell className="font-semibold pl-4">KTB</TableCell>
-                                        <TableCell className="pl-8">Luas Basemen</TableCell>
+                                        <TableCell className="pl-8">Luas Tapak Basemen</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.ktb_luas_basemen} />
@@ -830,59 +921,59 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 30" type="text" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 50" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
                                             <SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange}>{dropdownKtb}</SelectInput>
                                         </TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 2 KTB */}
                                     <tr>
                                         <TableCell></TableCell>
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
-                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
                                         <TableCell></TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 3 KTB */}
                                     <tr>
                                         <TableCell></TableCell>
-                                        <TableCell className="pl-8 italic">Luas Basemen : Luas Tanah</TableCell>
+                                        <TableCell className="pl-8 italic">Luas Tapak Basemen : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="ktb_luas_basemen_rasio"
                                                     value={formData.ktb_luas_basemen_rasio}
                                                     onChange={handleChange}
-                                                    placeholder="Rasio (cth: 0.3)"
-                                                    title="Input Manual: Luas Basemen : Luas Tanah"
+                                                    onBlur={handleBlur}
+                                                    placeholder="Rasio (cth: 0.5)"
+                                                    title="Input Manual: Luas Tapak Basemen : Luas Tanah"
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell></TableCell>
                                         <TableCell></TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 2) Baris 4 KTB (Baru) */}
                                     <tr>
                                         <TableCell></TableCell>
-                                        <TableCell className="pl-8">Perbandingan Luas Basemen dengan luas tanah (x100%)</TableCell>
+                                        <TableCell className="pl-8">Perbandingan Luas Tapak Basemen dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* SOLUSI 3: Ganti onChange ke handleChange */}
-                                                <ManualInput 
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput
                                                     type="text"
                                                     name="ktb_perbandingan_manual"
                                                     value={formData.ktb_perbandingan_manual}
                                                     onChange={handleChange}
-                                                    placeholder="Persen (cth: 30)"
+                                                    onBlur={handleBlur}
+                                                    placeholder="cth: 50"
                                                     title="Input Manual: Perbandingan (x100%)"
                                                 />
                                             </InputWithUnit>
@@ -897,10 +988,9 @@ export default function FormulirAnalisisPage() {
                                             GSB (Garis Sempadan Bangunan)
                                         </TableCell>
                                     </tr>
-                                    {/* (PERBAIKAN Poin 1) Baris 1 GSB */}
                                     <tr>
                                         <TableCell className="font-semibold pl-4">GSB</TableCell>
-                                        <TableCell className="pl-8">Jarak Bangunan Terdepan dgn Pagar</TableCell>
+                                        <TableCell className="pl-8">Jarak Bangunan terhadap Batas Petak (Depan)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
                                                 <ReadOnlyInput value={dataPrefill.gsb_jarak} />
@@ -908,12 +998,15 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
-                                                <ManualInput name="gsb_ketentuan_rtr" value={formData.gsb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 5" type="text" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="gsb_ketentuan_rtr" value={formData.gsb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 4" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell><SelectInput name="gsb_kesesuaian_rtr" value={formData.gsb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
+                                        <TableCell>
+                                            <SelectInput name="gsb_kesesuaian_rtr" value={formData.gsb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                        </TableCell>
                                     </tr>
-
+                                    
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen JBB */}
                                     <tr>
                                         <TableCell colSpan={5} className={blockHeaderClass}>
@@ -931,7 +1024,8 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
-                                                <ManualInput name="jbb_ketentuan_rtr" value={formData.jbb_ketentuan_rtr} onChange={handleChange} placeholder="cth: 3" type="text" />
+                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                <ManualInput name="jbb_ketentuan_rtr" value={formData.jbb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 3" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
@@ -969,7 +1063,9 @@ export default function FormulirAnalisisPage() {
                                         key={member.id}
                                         member={member}
                                         signaturePath={formData.tanda_tangan_tim.find(sig => sig.user_id === member.id)?.signature}
-                                        signatureRef={el => signatureRefs.current[member.id] = el}
+                                        // (SOLUSI) Ganti prop untuk menghindari inline callback
+                                        signatureRefs={signatureRefs}
+                                        memberId={member.id}
                                     />
                                 ))
                             ) : (
