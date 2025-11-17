@@ -345,7 +345,7 @@ export default function FormulirAnalisisPage() {
         };
     }, [penilaian, kasus]);
     
-    // --- PENAMBAHAN BARU: useEffect untuk Kalkulasi Otomatis KDB ---
+    // --- PENAMBAHAN BARU: Kalkulasi Otomatis KDB ---
     useEffect(() => {
         // Ambil nilai dari dataPrefill
         const luasLantaiDasar = parseFloat(dataPrefill.kdb_luas_lantai_dasar);
@@ -385,6 +385,41 @@ export default function FormulirAnalisisPage() {
         
     // Dependensi: Kalkulasi ulang jika nilai prefill berubah
     }, [dataPrefill.kdb_luas_lantai_dasar, dataPrefill.luas_dikuasai, setFormData]);
+    // --- AKHIR PENAMBAHAN ---
+
+    // --- PENAMBAHAN BARU: Kalkulasi Otomatis KLB ---
+    useEffect(() => {
+        // 1. Ambil nilai-nilai
+        const luasSeluruhLantaiStr = dataPrefill.klb_luas_seluruh_lantai;
+        const luasTanahStr = formData.klb_luas_tanah;
+
+        // 2. Sanitasi dan Parse
+        // Sanitasi input Luas Tanah: ganti koma dengan titik, hapus non-numerik kecuali titik
+        const sanitizedLuasTanahStr = String(luasTanahStr ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, '');
+        
+        const luasSeluruhLantai = parseFloat(luasSeluruhLantaiStr);
+        const luasTanah = parseFloat(sanitizedLuasTanahStr);
+
+        // 3. Kalkulasi
+        if (!isNaN(luasSeluruhLantai) && !isNaN(luasTanah) && luasTanah > 0) {
+            const rasio = luasSeluruhLantai / luasTanah;
+            const formattedRasio = rasio.toFixed(3); // Sesuai permintaan 2-3 desimal
+
+            // 4. Update state
+            setFormData(prev => ({
+                ...prev,
+                klb_luas_seluruh_lantai_rasio: formattedRasio
+            }));
+        } else {
+            // 5. Reset jika input tidak valid
+            setFormData(prev => ({
+                ...prev,
+                klb_luas_seluruh_lantai_rasio: ''
+            }));
+        }
+
+    // 6. Dependensi: data prefill dan field input manual
+    }, [dataPrefill.klb_luas_seluruh_lantai, formData.klb_luas_tanah, setFormData]);
     // --- AKHIR PENAMBAHAN ---
 
 
@@ -860,16 +895,11 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Seluruh Lantai : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
-                                                <ManualInput 
-                                                    type="text"
-                                                    name="klb_luas_seluruh_lantai_rasio"
+                                                {/* --- PERUBAHAN: Diubah menjadi ReadOnlyInput untuk kalkulasi otomatis --- */}
+                                                <ReadOnlyInput 
                                                     value={formData.klb_luas_seluruh_lantai_rasio}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    placeholder="Rasio (cth: 1.2)"
-                                                    title="Input Manual: Luas Seluruh Lantai : Luas Tanah"
                                                 />
+                                                {/* --- AKHIR PERUBAHAN --- */}
                                             </InputWithUnit>
                                         </TableCell>
                                         {/* PERBAIKAN (B.2): Sel Ketentuan kosong DIHAPUS */}
