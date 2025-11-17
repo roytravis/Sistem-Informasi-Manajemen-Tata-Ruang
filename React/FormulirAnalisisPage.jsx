@@ -46,7 +46,8 @@ const SelectInput = memo(({ name, value, onChange, children, className = "" }) =
         name={name}
         value={value ?? ''}
         onChange={onChange}
-        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`}
+        // (PERBAIKAN) Hapus min-h-[38px], tambahkan h-auto dan whitespace-normal agar teks panjang bisa wrap
+        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 h-auto whitespace-normal ${className}`}
     >
         {children}
     </select>
