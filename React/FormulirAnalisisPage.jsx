@@ -422,6 +422,48 @@ export default function FormulirAnalisisPage() {
     }, [dataPrefill.klb_luas_seluruh_lantai, formData.klb_luas_tanah, setFormData]);
     // --- AKHIR PENAMBAHAN ---
 
+    // --- PENAMBAHAN BARU: Kalkulasi Otomatis KDH ---
+    useEffect(() => {
+        // 1. Ambil nilai-nilai
+        const luasVegetasiStr = dataPrefill.kdh_vegetasi;
+        const luasTanahStr = formData.kdh_luas_tanah;
+
+        // 2. Sanitasi dan Parse
+        // Sanitasi input Luas Tanah (karena user-editable)
+        const sanitizedLuasTanahStr = String(luasTanahStr ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, '');
+        
+        const luasVegetasi = parseFloat(luasVegetasiStr);
+        const luasTanah = parseFloat(sanitizedLuasTanahStr);
+
+        // 3. Kalkulasi
+        if (!isNaN(luasVegetasi) && !isNaN(luasTanah) && luasTanah > 0) {
+            // Sesuai rumus
+            const rasio = luasVegetasi / luasTanah;
+            const percentage = rasio * 100;
+
+            // Format ke 3 desimal (rasio) and 2 desimal (persen)
+            const formattedRasio = rasio.toFixed(3);
+            const formattedPercentage = percentage.toFixed(2);
+
+            // 4. Update state
+            setFormData(prev => ({
+                ...prev,
+                kdh_rasio_manual: formattedRasio,
+                kdh_perbandingan_manual: formattedPercentage
+            }));
+        } else {
+            // 5. Reset jika input tidak valid (Luas Tanah = 0 or empty)
+            setFormData(prev => ({
+                ...prev,
+                kdh_rasio_manual: '',
+                kdh_perbandingan_manual: ''
+            }));
+        }
+
+    // 6. Dependensi: data prefill dan field input manual
+    }, [dataPrefill.kdh_vegetasi, formData.kdh_luas_tanah, setFormData]);
+    // --- AKHIR PENAMBAHAN ---
+
 
     // (SOLUSI) Bungkus handleChange dengan useCallback agar referensinya stabil
     const handleChange = useCallback((e) => {
@@ -995,16 +1037,11 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Vegetasi : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
-                                                <ManualInput 
-                                                    type="text"
-                                                    name="kdh_rasio_manual"
+                                                {/* --- PERUBAHAN: Diubah menjadi ReadOnlyInput --- */}
+                                                <ReadOnlyInput 
                                                     value={formData.kdh_rasio_manual}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    placeholder="Rasio (cth: 0.2)"
-                                                    title="Input Manual: Luas Vegetasi : Luas Tanah"
                                                 />
+                                                {/* --- AKHIR PERUBAHAN --- */}
                                             </InputWithUnit>
                                         </TableCell>
                                         {/* INSTRUKSI A.2: <TableCell></TableCell> DIHAPUS */}
@@ -1016,16 +1053,11 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Perbandingan Luas Vegetasi dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
-                                                <ManualInput
-                                                    type="text"
-                                                    name="kdh_perbandingan_manual"
+                                                {/* --- PERUBAHAN: Diubah menjadi ReadOnlyInput --- */}
+                                                <ReadOnlyInput
                                                     value={formData.kdh_perbandingan_manual}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    placeholder="cth: 20"
-                                                    title="Input Manual: Perbandingan (x100%)"
                                                 />
+                                                {/* --- AKHIR PERUBAHAN --- */}
                                             </InputWithUnit>
                                         </TableCell>
                                         {/* INSTRUKSI A.2: <TableCell></TableCell> DIHAPUS */}
