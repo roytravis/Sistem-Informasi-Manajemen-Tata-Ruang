@@ -13,8 +13,8 @@ const TableHeader = memo(({ children, colSpan = 1, rowSpan = 1, className = "" }
     </th>
 ));
 
-const TableCell = memo(({ children, className = "" }) => (
-    <td className={`py-2 px-3 border border-gray-300 align-middle ${className}`}>
+const TableCell = memo(({ children, className = "", rowSpan = 1 }) => ( // Tambahkan rowSpan di sini
+    <td className={`py-2 px-3 border border-gray-300 align-middle ${className}`} rowSpan={rowSpan}>
         {children}
     </td>
 ));
@@ -36,7 +36,8 @@ const ManualInput = memo(({ name, value, onChange, onBlur, placeholder = "", typ
         placeholder={placeholder}
         title={title} // Menambahkan tooltip
         style={{ textAlign: 'left' }}
-        className={`w-full p-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[38px] ${className}`}
+        // Kelas `border` ditambahkan dari solusi sebelumnya
+        className={`w-full p-2 text-sm border border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-0 focus:outline-none min-h-[38px] ${className}`}
     />
 ));
 
@@ -56,8 +57,12 @@ const SelectInput = memo(({ name, value, onChange, children, className = "" }) =
 // dan dibungkus dengan memo() untuk mencegah re-render yang tidak perlu.
 const InputWithUnit = memo(({ children, unit, className = "" }) => (
     <div className={`flex items-center gap-2 w-full ${className}`}>
-        {/* Tambahkan flex-shrink-0 agar div input tidak 'mengecil' saat diketik */}
-        <div className="flex-grow min-w-[6rem] flex-shrink-0">
+        {/* --- INI PERBAIKANNYA ---
+          Menghapus `min-w-[6rem]` dan `flex-shrink-0`
+          Ini memungkinkan input untuk mengecil (shrink) agar pas
+          di dalam sel tabel yang sempit (`w-[15%]`).
+        */}
+        <div className="flex-grow">
             {children}
         </div>
         {/* Tambahkan flex-shrink-0 agar span satuan tidak 'mengecil' */}
@@ -176,9 +181,9 @@ export default function FormulirAnalisisPage() {
         jenis_ketentuan_rtr: '',
         jenis_kesesuaian_rtr: 'Sesuai',
         luas_digunakan_ketentuan_rtr: '',
-        luas_digunakan_kesesuaian_rtr: 'Sesuai',
         luas_dikuasai_ketentuan_rtr: '',
-        luas_dikuasai_kesesuaian_rtr: 'Sesuai',
+        // (PERBAIKAN UI/UX) State kesesuaian Luas Tanah digabung
+        luas_tanah_kesesuaian_rtr: 'Sesuai', 
         // C.1 KDB
         kdb_ketentuan_rtr: '',
         kdb_kesesuaian_rtr: 'Sesuai',
@@ -260,6 +265,13 @@ export default function FormulirAnalisisPage() {
                             kdh_perbandingan_manual: String(analisisRes.data.kdh_perbandingan_vegetasi ?? ''),
                             ktb_luas_basemen_rasio: String(analisisRes.data.ktb_rasio_manual ?? ''),
                             ktb_perbandingan_manual: String(analisisRes.data.ktb_persen_manual ?? ''),
+
+                            // (PERBAIKAN UI/UX) Konsolidasi state kesesuaian Luas Tanah
+                            // Ambil dari state baru, atau fallback ke state lama (luas_digunakan) jika data lama
+                            luas_tanah_kesesuaian_rtr: analisisRes.data.luas_tanah_kesesuaian_rtr ?? analisisRes.data.luas_digunakan_kesesuaian_rtr ?? 'Sesuai',
+                            // Hapus state lama agar tidak bentrok
+                            luas_digunakan_kesesuaian_rtr: undefined,
+                            luas_dikuasai_kesesuaian_rtr: undefined,
                             
                             // Pastikan ttd disimpan sebagai path
                             tanda_tangan_tim: (analisisRes.data.tanda_tangan_tim || []).map(sig => ({
@@ -603,40 +615,48 @@ export default function FormulirAnalisisPage() {
                                             Luas Tanah
                                         </TableCell>
                                     </tr>
+                                    
+                                    {/* --- PERUBAHAN Luas Tanah (Original) --- */}
                                     {/* (PERBAIKAN Poin 1) Baris 1 Luas Tanah (5 kolom) */}
                                     <tr>
-                                        <TableCell className="font-semibold pl-4">Luas Tanah</TableCell>
+                                        {/* Request 1: Tambahkan rowSpan=2 */}
+                                        <TableCell className="font-semibold pl-4" rowSpan={2}>Luas Tanah</TableCell>
                                         <TableCell className="pl-8">Luas Tanah yang digunakan</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.luas_digunakan} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* Request 2: Tambahkan rowSpan=2 */}
+                                        {/* (PERBAIKAN 2) Tambahkan className="border-r" untuk memperbaiki bug render border-collapse pada sel rowspan */}
+                                        <TableCell rowSpan={2} className="border-r">
                                             <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
-                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah Digunakan" />
+                                                {/* Hanya satu input field, title diubah menjadi generik */}
+                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell><SelectInput name="luas_digunakan_kesesuaian_rtr" value={formData.luas_digunakan_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
+                                        {/* (PERBAIKAN UI/UX) Tambahkan rowSpan=2 dan update state/name */}
+                                        <TableCell rowSpan={2}>
+                                            <SelectInput name="luas_tanah_kesesuaian_rtr" value={formData.luas_tanah_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                        </TableCell>
                                     </tr>
                                     {/* (PERBAIKAN Poin 1) Baris 2 Luas Tanah (5 kolom) */}
                                     <tr>
-                                        <TableCell></TableCell> {/* Sel Komponen kosong */}
+                                        {/* Request 1: Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8">Luas Tanah yang dikuasai</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.luas_dikuasai} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
-                                            <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
-                                                <ManualInput name="luas_dikuasai_ketentuan_rtr" value={formData.luas_dikuasai_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah Dikuasai"/>
-                                            </InputWithUnit>
-                                        </TableCell>
-                                        <TableCell><SelectInput name="luas_dikuasai_kesesuaian_rtr" value={formData.luas_dikuasai_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput></TableCell>
+                                        {/* Request 2: Sel Ketentuan RTR DIHAPUS */}
+                                        {/* <TableCell> ... </TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell>...</TableCell> */}
                                     </tr>
+                                    {/* --- PERUBAHAN Luas Tanah (Original) SELESAI --- */}
+
 
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen KDB */}
                                     <tr>
@@ -644,40 +664,50 @@ export default function FormulirAnalisisPage() {
                                             KDB (Koefisien Dasar Bangunan)
                                         </TableCell>
                                     </tr>
+                                    
+                                    {/* === PERBAIKAN KDB DIMULAI === */}
+                                    
                                     {/* (PERBAIKAN Poin 1) Baris 1 KDB (5 kolom) */}
                                     <tr>
-                                        <TableCell className="font-semibold pl-4">KDB</TableCell>
+                                        {/* PERBAIKAN (A.1): Menambahkan rowSpan={4} */}
+                                        <TableCell className="font-semibold pl-4" rowSpan={4}>KDB</TableCell>
                                         <TableCell className="pl-8">Luas Lantai Dasar Bangunan</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.kdb_luas_lantai_dasar} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* PERBAIKAN (A.2): Menambahkan rowSpan={4} */}
+                                        <TableCell rowSpan={4}>
                                             <InputWithUnit unit="%">
                                                 {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 60" type="text"/>
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* (PERBAIKAN UI/UX) Tambahkan rowSpan={4} */}
+                                        <TableCell rowSpan={4}>
                                             <SelectInput name="kdb_kesesuaian_rtr" value={formData.kdb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     {/* (PERBAIKAN Poin 1) Baris 2 KDB (5 kolom) */}
                                     <tr>
-                                        <TableCell></TableCell> {/* Sel Komponen kosong */}
+                                        {/* PERBAIKAN (A.1): Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8">Luas Tanah (dikuasai)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.luas_dikuasai} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell> {/* Sel Ketentuan kosong */}
-                                        <TableCell></TableCell> {/* Sel Hasil kosong */}
+                                        {/* PERBAIKAN (A.2): Sel Ketentuan kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     {/* (PERBAIKAN Poin 3) Baris 3 KDB (5 kolom) */}
                                     <tr>
-                                        <TableCell></TableCell> {/* Sel Komponen kosong */}
+                                        {/* PERBAIKAN (A.1): Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8 italic">Luas Lantai Dasar : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
@@ -693,12 +723,15 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell> {/* Sel Ketentuan kosong */}
-                                        <TableCell></TableCell> {/* Sel Hasil kosong */}
+                                        {/* PERBAIKAN (A.2): Sel Ketentuan kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     {/* (PERBAIKAN Poin 2) Baris 4 KDB (Baru) */}
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (A.1): Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8">Perbandingan Luas Lantai Dasar dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
@@ -714,9 +747,13 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (A.2): Sel Ketentuan kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
+                                    
+                                    {/* === PERBAIKAN KDB SELESAI === */}
 
 
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen KLB */}
@@ -725,40 +762,50 @@ export default function FormulirAnalisisPage() {
                                             KLB (Koefisien Lantai Bangunan)
                                         </TableCell>
                                     </tr>
+                                    
+                                    {/* === PERBAIKAN KLB DIMULAI === */}
+                                    
                                     {/* (PERBAIKAN Poin 1) Baris 1 KLB */}
                                     <tr>
-                                        <TableCell className="font-semibold pl-4">KLB</TableCell>
+                                        {/* PERBAIKAN (B.1): Menambahkan rowSpan={4} */}
+                                        <TableCell className="font-semibold pl-4" rowSpan={4}>KLB</TableCell>
                                         <TableCell className="pl-8">Jumlah Lantai Bangunan</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="lantai">
                                                 <ReadOnlyInput value={dataPrefill.klb_jumlah_lantai} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* PERBAIKAN (B.2): Menambahkan rowSpan={4} */}
+                                        <TableCell rowSpan={4}>
                                             <InputWithUnit>
                                                 {/* PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 1.2" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* (PERBAIKAN UI/UX) Tambahkan rowSpan={4} */}
+                                        <TableCell rowSpan={4}>
                                             <SelectInput name="klb_kesesuaian_rtr" value={formData.klb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     {/* (PERBAIKAN Poin 1) Baris 2 KLB */}
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (B.1): Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8">Luas Seluruh Lantai Bangunan</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.klb_luas_seluruh_lantai} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (B.2): Sel Ketentuan kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     {/* (PERBAIKAN Poin 1) Baris 3 KLB */}
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (B.1): Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
@@ -766,12 +813,15 @@ export default function FormulirAnalisisPage() {
                                                 <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (B.2): Sel Ketentuan kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     {/* (PERBAIKAN Poin 1 & 4) Baris 4 KLB */}
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (B.1): Sel Komponen kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
                                         <TableCell className="pl-8 italic">Luas Seluruh Lantai : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
@@ -787,9 +837,13 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* PERBAIKAN (B.2): Sel Ketentuan kosong DIHAPUS */}
+                                        {/* <TableCell></TableCell> */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
+
+                                    {/* === PERBAIKAN KLB SELESAI === */}
                                     
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen Ketinggian Bangunan */}
                                     <tr>
@@ -823,53 +877,60 @@ export default function FormulirAnalisisPage() {
                                             KDH (Koefisien Daerah Hijau)
                                         </TableCell>
                                     </tr>
+                                    
+                                    {/* === PERBAIKAN KDH (Sesuai Instruksi) === */}
                                     <tr>
-                                        <TableCell className="font-semibold pl-4">KDH</TableCell>
+                                        {/* INSTRUKSI A.1: Tambah rowspan="5" */}
+                                        <TableCell className="font-semibold pl-4" rowSpan={5}>KDH</TableCell>
                                         <TableCell className="pl-8">Luas Vegetasi</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.kdh_vegetasi} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* INSTRUKSI A.2: Tambah rowspan="5" */}
+                                        <TableCell rowSpan={5}>
                                             <InputWithUnit unit="%">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 20" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* (PERBAIKAN UI/UX) Tambahkan rowSpan={5} */}
+                                        <TableCell rowSpan={5}>
                                             <SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8">Luas Perkerasan</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.kdh_perkerasan} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8 italic">Luas Vegetasi : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="kdh_rasio_manual"
@@ -881,15 +942,16 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8">Perbandingan Luas Vegetasi dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput
                                                     type="text"
                                                     name="kdh_perbandingan_manual"
@@ -901,9 +963,12 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI A.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
+                                    {/* === AKHIR PERBAIKAN KDH === */}
+
 
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen KTB */}
                                     <tr>
@@ -911,42 +976,48 @@ export default function FormulirAnalisisPage() {
                                             KTB (Koefisien Tapak Basemen)
                                         </TableCell>
                                     </tr>
+                                    
+                                    {/* === PERBAIKAN KTB (Sesuai Instruksi) === */}
                                     <tr>
-                                        <TableCell className="font-semibold pl-4">KTB</TableCell>
+                                        {/* INSTRUKSI B.1: Tambah rowspan="4" */}
+                                        <TableCell className="font-semibold pl-4" rowSpan={4}>KTB</TableCell>
                                         <TableCell className="pl-8">Luas Tapak Basemen</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
                                                 <ReadOnlyInput value={dataPrefill.ktb_luas_basemen} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* INSTRUKSI B.2: Tambah rowspan="4" */}
+                                        <TableCell rowSpan={4}>
                                             <InputWithUnit unit="%">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 50" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* (PERBAIKAN UI/UX) Tambahkan rowSpan={4} */}
+                                        <TableCell rowSpan={4}>
                                             <SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange}>{dropdownKtb}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI B.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI B.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI B.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8 italic">Luas Tapak Basemen : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput 
                                                     type="text"
                                                     name="ktb_luas_basemen_rasio"
@@ -958,15 +1029,16 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI B.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI B.1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8">Perbandingan Luas Tapak Basemen dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* PERBAIKAN: Menambahkan onBlur (sudah ada) */}
                                                 <ManualInput
                                                     type="text"
                                                     name="ktb_perbandingan_manual"
@@ -978,9 +1050,12 @@ export default function FormulirAnalisisPage() {
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI B.2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
+                                    {/* === AKHIR PERBAIKAN KTB === */}
+
 
                                     {/* (PERBAIKAN Poin 2, 5) Header Komponen GSB */}
                                     <tr>
@@ -991,6 +1066,7 @@ export default function FormulirAnalisisPage() {
                                     <tr>
                                         <TableCell className="font-semibold pl-4">GSB</TableCell>
                                         <TableCell className="pl-8">Jarak Bangunan terhadap Batas Petak (Depan)</TableCell>
+
                                         <TableCell>
                                             <InputWithUnit unit="m">
                                                 <ReadOnlyInput value={dataPrefill.gsb_jarak} />
@@ -1015,38 +1091,38 @@ export default function FormulirAnalisisPage() {
                                     </tr>
                                     {/* (PERBAIKAN Poin 1) Baris 1 JBB */}
                                     <tr>
-                                        <TableCell className="font-semibold pl-4">JBB</TableCell>
+                                        {/* INSTRUKSI 1: Tambahkan rowSpan={2} */}
+                                        <TableCell className="font-semibold pl-4" rowSpan={2}>JBB</TableCell>
                                         <TableCell className="pl-8">Jarak Bangunan (Batas Petak Belakang)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
                                                 <ReadOnlyInput value={dataPrefill.jbb_belakang} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* INSTRUKSI 2: Tambahkan rowSpan={2} dan className "border-r" untuk fix border-collapse */}
+                                        <TableCell rowSpan={2} className="border-r">
                                             <InputWithUnit unit="m">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
+                                                {/* (Sudah ada) PERBAIKAN: Menambahkan onBlur */}
                                                 <ManualInput name="jbb_ketentuan_rtr" value={formData.jbb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 3" type="text" />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
+                                        {/* (PERBAIKAN UI/UX) Tambahkan rowSpan={2} */}
+                                        <TableCell rowSpan={2}>
                                             <SelectInput name="jbb_kesesuaian_rtr" value={formData.jbb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     {/* (PERBAIKAN Poin 1) Baris 2 JBB */}
                                     <tr>
-                                        <TableCell></TableCell>
+                                        {/* INSTRUKSI 1: <TableCell></TableCell> DIHAPUS */}
                                         <TableCell className="pl-8">Jarak Bangunan (Batas Petak Samping)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
                                                 <ReadOnlyInput value={dataPrefill.jbb_samping} />
                                             </InputWithUnit>
                                         </TableCell>
-                                        <TableCell>
-                                             {/* Sel ini sengaja dikosongkan agar sejajar dengan baris JBB pertama */}
-                                        </TableCell>
-                                        <TableCell>
-                                             {/* Sel ini sengaja dikosongkan agar sejajar dengan baris JBB pertama */}
-                                        </TableCell>
+                                        {/* INSTRUKSI 2: <TableCell></TableCell> DIHAPUS */}
+                                        {/* (PERBAIKAN UI/UX) Hapus sel terakhir karena sudah di-rowSpan */}
+                                        {/* <TableCell></TableCell> */}
                                     </tr>
                                 </tbody>
                             </table>
