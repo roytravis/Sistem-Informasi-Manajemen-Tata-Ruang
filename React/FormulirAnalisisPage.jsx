@@ -345,6 +345,49 @@ export default function FormulirAnalisisPage() {
         };
     }, [penilaian, kasus]);
     
+    // --- PENAMBAHAN BARU: useEffect untuk Kalkulasi Otomatis KDB ---
+    useEffect(() => {
+        // Ambil nilai dari dataPrefill
+        const luasLantaiDasar = parseFloat(dataPrefill.kdb_luas_lantai_dasar);
+        const luasTanah = parseFloat(dataPrefill.luas_dikuasai);
+
+        // Lakukan kalkulasi hanya jika input valid dan luasTanah tidak nol
+        if (!isNaN(luasLantaiDasar) && !isNaN(luasTanah) && luasTanah > 0) {
+            
+            // 1. Hitung Rasio
+            const rasio = luasLantaiDasar / luasTanah;
+            // Format ke 3 desimal sesuai permintaan
+            const formattedRasio = rasio.toFixed(3);
+
+            // 2. Hitung Persentase
+            const percentage = rasio * 100;
+            // Format ke 2 desimal
+            const formattedPercentage = percentage.toFixed(2);
+
+            // 3. Update state formData untuk kedua field
+            setFormData(prev => ({
+                ...prev,
+                kdb_luas_lantai_dasar_rasio: formattedRasio, // Field rasio
+                kdb_perbandingan_manual: formattedPercentage  // Field persentase
+            }));
+
+        } else {
+            // Jika input tidak valid (misal 0 atau null), kosongkan field
+            // Cek agar tidak mengosongkan field jika user sudah mengisi manual
+            // (Meskipun di sini inputnya read-only, ini best practice)
+            setFormData(prev => ({
+                ...prev,
+                // Hanya kosongkan jika field-nya memang belum diisi (atau masih kosong)
+                kdb_luas_lantai_dasar_rasio: prev.kdb_luas_lantai_dasar_rasio || '',
+                kdb_perbandingan_manual: prev.kdb_perbandingan_manual || ''
+            }));
+        }
+        
+    // Dependensi: Kalkulasi ulang jika nilai prefill berubah
+    }, [dataPrefill.kdb_luas_lantai_dasar, dataPrefill.luas_dikuasai, setFormData]);
+    // --- AKHIR PENAMBAHAN ---
+
+
     // (SOLUSI) Bungkus handleChange dengan useCallback agar referensinya stabil
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
@@ -711,16 +754,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8 italic">Luas Lantai Dasar : Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit>
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
-                                                <ManualInput 
-                                                    type="text"
-                                                    name="kdb_luas_lantai_dasar_rasio"
+                                                {/* --- PERUBAHAN: Input rasio --- */}
+                                                {/* Menggunakan ReadOnlyInput karena nilai dihitung otomatis */}
+                                                <ReadOnlyInput 
                                                     value={formData.kdb_luas_lantai_dasar_rasio}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    placeholder="Rasio (cth: 0.6)"
-                                                    title="Input Manual: Luas Lantai Dasar : Luas Tanah"
                                                 />
+                                                {/* --- AKHIR PERUBAHAN --- */}
                                             </InputWithUnit>
                                         </TableCell>
                                         {/* PERBAIKAN (A.2): Sel Ketentuan kosong DIHAPUS */}
@@ -735,16 +774,12 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Perbandingan Luas Lantai Dasar dengan Luas Tanah (x100%)</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="%">
-                                                {/* PERBAIKAN: Menambahkan onBlur */}
-                                                <ManualInput
-                                                    type="text"
-                                                    name="kdb_perbandingan_manual"
+                                                {/* --- PERUBAHAN: Input persentase --- */}
+                                                {/* Menggunakan ReadOnlyInput karena nilai dihitung otomatis */}
+                                                <ReadOnlyInput
                                                     value={formData.kdb_perbandingan_manual}
-                                                    onChange={handleChange}
-                                                    onBlur={handleBlur}
-                                                    placeholder="cth: 60"
-                                                    title="Input Manual: Perbandingan (x100%)"
                                                 />
+                                                {/* --- AKHIR PERUBAHAN --- */}
                                             </InputWithUnit>
                                         </TableCell>
                                         {/* PERBAIKAN (A.2): Sel Ketentuan kosong DIHAPUS */}
