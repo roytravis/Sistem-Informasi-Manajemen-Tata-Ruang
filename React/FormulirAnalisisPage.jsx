@@ -1,8 +1,92 @@
 import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import api from '../api/axios.js'; // PERBAIKAN: Path disesuaikan ke root
+import api from '../api/axios.js';
 import SignatureCanvas from 'react-signature-canvas';
 import { useAuth } from '../context/AuthContext';
+
+// --- CSS KHUSUS UNTUK PRINT ---
+const PrintStyles = () => (
+    <style>
+        {`
+            @media print {
+                /* Sembunyikan elemen navigasi dan tombol aksi saat print */
+                .no-print, nav, button, .action-bar {
+                    display: none !important;
+                }
+                
+                /* Pastikan background putih dan font hitam */
+                body, .printable-area {
+                    background-color: white !important;
+                    color: black !important;
+                    font-family: 'Times New Roman', Times, serif;
+                }
+
+                /* Hilangkan shadow dan margin container */
+                .printable-area {
+                    box-shadow: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    max-width: 100% !important;
+                }
+
+                /* Ubah tampilan input/select menjadi teks biasa */
+                input, select, textarea {
+                    border: none !important;
+                    background: transparent !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    appearance: none !important; /* Hilangkan panah dropdown */
+                    -webkit-appearance: none !important;
+                    -moz-appearance: none !important;
+                    font-size: 11pt !important;
+                    width: auto !important;
+                    color: black !important;
+                }
+                
+                /* Sembunyikan placeholder */
+                ::placeholder {
+                    color: transparent;
+                }
+
+                /* Styling Tabel Cetak */
+                table {
+                    width: 100% !important;
+                    border-collapse: collapse !important;
+                }
+                th, td {
+                    border: 1px solid #000 !important; /* Border hitam tegas */
+                    padding: 4px !important;
+                    font-size: 11pt !important;
+                }
+                th {
+                    background-color: #f0f0f0 !important; /* Abu-abu muda untuk header */
+                    -webkit-print-color-adjust: exact; /* Paksa cetak background color */
+                }
+
+                /* Page Break Control */
+                fieldset {
+                    border: 1px solid #000 !important;
+                    margin-bottom: 10px !important;
+                    break-inside: avoid;
+                }
+                legend {
+                    font-weight: bold;
+                }
+                
+                /* Tanda Tangan */
+                .signature-canvas-container {
+                    display: none !important;
+                }
+                .signature-image-container {
+                    display: block !important;
+                }
+                .signature-block {
+                    border: none !important; /* Hilangkan kotak pembungkus perorangan saat print */
+                }
+            }
+        `}
+    </style>
+);
 
 // --- Komponen-komponen Reusable ---
 
@@ -12,7 +96,6 @@ const TableHeader = memo(({ children, colSpan = 1, rowSpan = 1, className = "" }
     </th>
 ));
 
-// (DARI SOLUSI SEBELUMNYA) Tetap gunakan 'align-top'
 const TableCell = memo(({ children, className = "", rowSpan = 1 }) => (
     <td className={`py-2 px-3 border border-gray-300 align-top ${className}`} rowSpan={rowSpan}>
         {children}
@@ -20,32 +103,34 @@ const TableCell = memo(({ children, className = "", rowSpan = 1 }) => (
 ));
 
 const ReadOnlyInput = memo(({ value, className = "" }) => (
-    <div className={`w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px] flex items-center ${className}`}>
+    <div className={`w-full p-2 text-sm bg-gray-100 rounded-md min-h-[38px] flex items-center print:bg-transparent print:p-0 print:border-none ${className}`}>
         {value || '-'}
     </div>
 ));
 
-const ManualInput = memo(({ name, value, onChange, onBlur, placeholder = "", type = "text", title = "", className = "" }) => (
+const ManualInput = memo(({ name, value, onChange, onBlur, placeholder = "", type = "text", title = "", className = "", disabled = false }) => (
     <input
-        dir="ltr" // Memaksa input menjadi LTR
+        dir="ltr"
         type={type}
         name={name}
         value={value ?? ''}
         onChange={onChange}
-        onBlur={onBlur} // Menambahkan onBlur handler
-        placeholder={placeholder}
-        title={title} // Menambahkan tooltip
+        onBlur={onBlur}
+        placeholder={disabled ? "" : placeholder} // Sembunyikan placeholder saat disabled/preview
+        title={title}
+        disabled={disabled}
         style={{ textAlign: 'left' }}
-        className={`w-full p-2 text-sm border border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-0 focus:outline-none min-h-[38px] ${className}`}
+        className={`
+            w-full p-2 text-sm border border-gray-300 rounded-md shadow-sm 
+            focus:border-blue-500 focus:ring-0 focus:outline-none min-h-[38px] 
+            disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed
+            print:bg-transparent print:border-none print:shadow-none print:p-0
+            ${className}
+        `}
     />
 ));
 
-// --- PERBAIKAN YANG DIMINTA (DIMULAI) ---
-// Perbaikan berlapis untuk mengatasi teks terpotong pada <select>
-const SelectInput = memo(({ name, value, onChange, children, className = "" }) => {
-    
-    // Definisikan SVG untuk panah dropdown kustom.
-    // (Warna: Tailwind gray-500: #6b7280, sudah di URL-encode: %236b7280)
+const SelectInput = memo(({ name, value, onChange, children, className = "", disabled = false }) => {
     const customArrow = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%236b7280'%3E%3Cpath d='M8 11.25a.75.75 0 0 1-.53-.22l-4-4a.75.75 0 0 1 1.06-1.06L8 9.44l3.47-3.47a.75.75 0 0 1 1.06 1.06l-4 4a.75.75 0 0 1-.53.22Z'/%3E%3C/svg%3E")`;
 
     return (
@@ -53,29 +138,22 @@ const SelectInput = memo(({ name, value, onChange, children, className = "" }) =
             name={name}
             value={value ?? ''}
             onChange={onChange}
-            
-            // SOLUSI 1 (UX Fallback): Tambahkan 'title' attribute.
-            // Ini akan memunculkan tooltip browser saat hover
-            // jika teksnya terpotong.
             title={value} 
-            
-            // SOLUSI 2 (Visual): Gunakan 'appearance-none' & style kustom
-            // untuk memaksa text-wrapping bekerja.
-            style={{
+            disabled={disabled}
+            style={!disabled ? {
                 backgroundImage: customArrow,
-                backgroundPosition: `right 0.25rem center`, // posisikan panah
+                backgroundPosition: `right 0.25rem center`,
                 backgroundRepeat: 'no-repeat',
-                backgroundSize: '1.25em 1.25em', // ukuran panah
-            }}
+                backgroundSize: '1.25em 1.25em',
+            } : {}} // Hilangkan panah custom saat disabled agar terlihat seperti teks biasa (terutama saat print)
             
             className={`
                 w-full p-2 text-sm border-gray-300 rounded-md shadow-sm 
                 focus:border-blue-500 focus:ring-blue-500 
                 min-h-[38px] h-auto whitespace-normal break-words 
-                
-                appearance-none // Hapus style native OS
-                pr-8 // Beri ruang untuk panah kustom
-                
+                appearance-none pr-8 
+                disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-not-allowed disabled:border-gray-200
+                print:bg-transparent print:border-none print:shadow-none print:p-0 print:appearance-none
                 ${className}
             `}
         >
@@ -83,18 +161,17 @@ const SelectInput = memo(({ name, value, onChange, children, className = "" }) =
         </select>
     );
 });
-// --- PERBAIKAN YANG DIMINTA (SELESAI) ---
 
 const InputWithUnit = memo(({ children, unit, className = "" }) => (
     <div className={`flex items-center gap-2 w-full ${className}`}>
         <div className="flex-grow">
             {children}
         </div>
-        {unit && <span className="text-gray-600 w-8 flex-shrink-0">{unit}</span>}
+        {unit && <span className="text-gray-600 w-8 flex-shrink-0 print:text-black">{unit}</span>}
     </div>
 ));
 
-const PetugasPenilaiSignature = memo(({ member, signaturePath, signatureRefs, memberId }) => {
+const PetugasPenilaiSignature = memo(({ member, signaturePath, signatureRefs, memberId, isReadOnly }) => {
     const baseUrl = api.defaults.baseURL;
     const imageUrl = signaturePath ? `${baseUrl}/signatures/${signaturePath}?t=${new Date().getTime()}` : null;
 
@@ -111,36 +188,42 @@ const PetugasPenilaiSignature = memo(({ member, signaturePath, signatureRefs, me
     }, [signatureRefs, memberId]);
     
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 border rounded-md signature-block">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 border rounded-md signature-block bg-white">
             {/* Info Petugas */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Nama Petugas</label>
-                <p className="mt-0.5 p-2 border rounded-md bg-gray-100 text-sm min-h-[38px]">{member.nama}</p>
+                <p className="mt-0.5 p-2 border rounded-md bg-gray-50 text-sm min-h-[38px] print:bg-transparent print:border-none print:p-0 print:border-b print:border-black print:rounded-none">{member.nama}</p>
                 <label className="block text-sm font-medium text-gray-700 mt-1">Jabatan</label>
-                <p className="mt-0.5 p-2 border rounded-md bg-gray-100 text-sm min-h-[38px]">{member.pivot?.jabatan_di_tim || member.role}</p>
+                <p className="mt-0.5 p-2 border rounded-md bg-gray-50 text-sm min-h-[38px] print:bg-transparent print:border-none print:p-0">{member.pivot?.jabatan_di_tim || member.role}</p>
             </div>
             {/* Tanda Tangan */}
             <div>
                 <label className="block text-sm font-medium text-gray-700">Tanda Tangan:</label>
-                {/* 1. Tampilan Gambar */}
-                <div className="my-1 signature-image-container">
-                    {imageUrl ? (
-                        <img 
-                            src={imageUrl} 
-                            alt={`Tanda Tangan ${member.nama}`} 
-                            className="mx-auto h-20 border rounded bg-white object-contain"
-                        />
-                    ) : (
-                        <div className="h-20 border rounded bg-white flex items-center justify-center text-gray-400 text-sm">(Belum TTD)</div>
-                    )}
-                </div>
-                {/* 2. Canvas Tanda Tangan */}
-                <div className='signature-canvas-container'>
-                    <div className="border border-gray-300 rounded-md bg-white">
-                        <SignatureCanvas ref={setCanvasRef} penColor='black' canvasProps={{className: 'w-full h-20'}} />
+                
+                {/* 1. Tampilan Gambar (Selalu muncul jika ada path, atau saat ReadOnly) */}
+                {(imageUrl || isReadOnly) && (
+                    <div className="my-1 signature-image-container">
+                        {imageUrl ? (
+                            <img 
+                                src={imageUrl} 
+                                alt={`Tanda Tangan ${member.nama}`} 
+                                className="mx-auto h-20 border rounded bg-white object-contain print:border-none"
+                            />
+                        ) : (
+                            <div className="h-20 border rounded bg-white flex items-center justify-center text-gray-400 text-sm print:border-none">(Belum TTD)</div>
+                        )}
                     </div>
-                    <button type="button" onClick={handleClear} className="text-sm text-blue-600 hover:underline mt-1 no-print">Ulangi</button>
-                </div>
+                )}
+
+                {/* 2. Canvas Tanda Tangan (Hanya saat mode Edit/Input) */}
+                {!isReadOnly && (
+                    <div className='signature-canvas-container'>
+                        <div className="border border-gray-300 rounded-md bg-white">
+                            <SignatureCanvas ref={setCanvasRef} penColor='black' canvasProps={{className: 'w-full h-20'}} />
+                        </div>
+                        <button type="button" onClick={handleClear} className="text-sm text-blue-600 hover:underline mt-1 no-print">Ulangi</button>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -174,6 +257,11 @@ export default function FormulirAnalisisPage() {
     const [submitLoading, setSubmitLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // State untuk Mode Read-Only (Preview) vs Edit
+    const [isReadOnly, setIsReadOnly] = useState(false);
+    const [dataExists, setDataExists] = useState(false);
+    const [initialData, setInitialData] = useState(null); // Untuk fitur Batal
+
     const signatureRefs = useRef({});
 
     const [formData, setFormData] = useState({
@@ -184,41 +272,33 @@ export default function FormulirAnalisisPage() {
         luas_digunakan_ketentuan_rtr: '',
         luas_dikuasai_ketentuan_rtr: '',
         luas_tanah_kesesuaian_rtr: 'Sesuai', 
-        // C.1 KDB
         kdb_ketentuan_rtr: '',
         kdb_kesesuaian_rtr: 'Sesuai',
         kdb_luas_lantai_dasar_rasio: '',
         kdb_perbandingan_manual: '',
-        // C.2 KLB
         klb_luas_tanah: '',
         klb_ketentuan_rtr: '',
         klb_kesesuaian_rtr: 'Sesuai',
         klb_luas_seluruh_lantai_rasio: '',
-        // Ketinggian Bangunan
         ketinggian_ketentuan_rtr: '',
         ketinggian_kesesuaian_rtr: 'Sesuai',
-        // C.3 KDH
         kdh_luas_tanah: '',
         kdh_rasio_manual: '',
         kdh_perbandingan_manual: '',
         kdh_ketentuan_rtr: '',
         kdh_kesesuaian_rtr: 'Sesuai',
-        // C.4 KTB
         ktb_luas_tanah: '',
         ktb_ketentuan_rtr: '',
         ktb_kesesuaian_rtr: 'Sesuai',
         ktb_luas_basemen_rasio: '',
         ktb_perbandingan_manual: '',
-        // C.5 GSB
         gsb_ketentuan_rtr: '',
         gsb_kesesuaian_rtr: 'Sesuai',
-        // C.6 JBB
         jbb_ketentuan_rtr: '',
         jbb_kesesuaian_rtr: 'Sesuai',
         tanda_tangan_tim: [],
     });
 
-    // Ambil data pre-fill (pemegang & penilaian)
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -234,9 +314,9 @@ export default function FormulirAnalisisPage() {
                 try {
                     const analisisRes = await api.get(`/formulir-analisis/${kasusRes.data.penilaian.id}`);
                     if (analisisRes.data) {
-                        setFormData(prev => ({
-                            ...prev,
+                        const apiData = {
                             ...analisisRes.data,
+                            // Konversi null ke string kosong untuk controlled inputs
                             kdb_ketentuan_rtr: String(analisisRes.data.kdb_ketentuan_rtr ?? ''),
                             klb_ketentuan_rtr: String(analisisRes.data.klb_ketentuan_rtr ?? ''),
                             kdh_ketentuan_rtr: String(analisisRes.data.kdh_ketentuan_rtr ?? ''),
@@ -257,18 +337,24 @@ export default function FormulirAnalisisPage() {
                             ktb_luas_basemen_rasio: String(analisisRes.data.ktb_rasio_manual ?? ''),
                             ktb_perbandingan_manual: String(analisisRes.data.ktb_persen_manual ?? ''),
                             luas_tanah_kesesuaian_rtr: analisisRes.data.luas_tanah_kesesuaian_rtr ?? analisisRes.data.luas_digunakan_kesesuaian_rtr ?? 'Sesuai',
-                            luas_digunakan_kesesuaian_rtr: undefined,
-                            luas_dikuasai_kesesuaian_rtr: undefined,
                             tanda_tangan_tim: (analisisRes.data.tanda_tangan_tim || []).map(sig => ({
                                 user_id: sig.user_id,
                                 signature: sig.signature_path
                             })),
-                        }));
+                        };
+
+                        setFormData(prev => ({ ...prev, ...apiData }));
+                        // Simpan data awal untuk fitur Batal
+                        setInitialData({ ...formData, ...apiData });
+                        // Set status data exists dan read-only
+                        setDataExists(true);
+                        setIsReadOnly(true); 
                     }
                 } catch (analisisErr) {
                     if (analisisErr.response?.status !== 404) {
                         throw analisisErr;
                     }
+                    // Jika 404, biarkan isReadOnly false (mode input baru)
                 }
 
             } catch (err) {
@@ -280,7 +366,7 @@ export default function FormulirAnalisisPage() {
         fetchData();
     }, [kasusId]);
     
-    // Data pre-fill dari Pemegang (A. Data Pelaku UMK)
+    // Data pre-fill dari Pemegang
     const dataPelakuUMK = useMemo(() => {
         if (!kasus) return null;
         const { pemegang } = kasus;
@@ -293,7 +379,7 @@ export default function FormulirAnalisisPage() {
         };
     }, [kasus]);
 
-    // Data pre-fill dari Penilaian (B & C)
+    // Data pre-fill dari Penilaian
     const dataPrefill = useMemo(() => {
         if (!penilaian || !kasus) return {};
         const pem = penilaian.pemeriksaan || [];
@@ -301,123 +387,91 @@ export default function FormulirAnalisisPage() {
         const pemegang = kasus.pemegang || {};
 
         return {
-            // B.1 Lokasi
             lokasi_pmp: [pemegang.alamat, pemegang.desa_kelurahan, pemegang.kecamatan, pemegang.kabupaten, pemegang.provinsi, `Lat: ${pem[5]?.pernyataan_mandiri}`, `Bujur: ${pem[6]?.pernyataan_mandiri}`].filter(Boolean).join('\n'),
             lokasi_eksisting: [pem[0]?.pernyataan_mandiri, pem[1]?.pernyataan_mandiri, pem[2]?.pernyataan_mandiri, pem[3]?.pernyataan_mandiri, pem[4]?.pernyataan_mandiri, `Lat: ${pem[5]?.pernyataan_mandiri}`, `Bujur: ${pem[6]?.pernyataan_mandiri}`].filter(Boolean).join('\n'),
-            // B.2 Jenis
             jenis_pmp: pemegang.kegiatan,
             jenis_eksisting: pem[7]?.pernyataan_mandiri,
-            // C.0 Umum
             luas_digunakan: png[0]?.hasil_pengukuran,
             luas_dikuasai: png[1]?.hasil_pengukuran,
-            // C.1 KDB
             kdb_luas_lantai_dasar: png[2]?.hasil_pengukuran,
-            // C.2 KLB
             klb_jumlah_lantai: png[3]?.hasil_pengukuran,
             klb_luas_seluruh_lantai: png[4]?.hasil_pengukuran,
             klb_ketinggian: png[5]?.hasil_pengukuran,
-            // C.3 KDH
             kdh_vegetasi: png[6]?.hasil_pengukuran,
             kdh_perkerasan: png[7]?.hasil_pengukuran,
-            // C.4 KTB
             ktb_luas_basemen: png[8]?.hasil_pengukuran,
-            // C.5 GSB
             gsb_jarak: png[9]?.hasil_pengukuran,
-            // C.6 JBB
             jbb_belakang: png[10]?.hasil_pengukuran,
             jbb_samping: png[11]?.hasil_pengukuran,
         };
     }, [penilaian, kasus]);
     
-    // Kalkulasi Otomatis KDB
+    // Kalkulasi Otomatis (Hanya berjalan jika TIDAK ReadOnly)
     useEffect(() => {
+        if (isReadOnly) return;
+
+        // KDB
         const luasLantaiDasar = parseFloat(dataPrefill.kdb_luas_lantai_dasar);
-        const luasTanah = parseFloat(dataPrefill.luas_dikuasai);
-
-        if (!isNaN(luasLantaiDasar) && !isNaN(luasTanah) && luasTanah > 0) {
-            const rasio = luasLantaiDasar / luasTanah;
-            const formattedRasio = rasio.toFixed(3);
-            const percentage = rasio * 100;
-            const formattedPercentage = percentage.toFixed(2);
+        const luasTanahKdb = parseFloat(dataPrefill.luas_dikuasai);
+        if (!isNaN(luasLantaiDasar) && !isNaN(luasTanahKdb) && luasTanahKdb > 0) {
+            const rasio = luasLantaiDasar / luasTanahKdb;
             setFormData(prev => ({
                 ...prev,
-                kdb_luas_lantai_dasar_rasio: formattedRasio,
-                kdb_perbandingan_manual: formattedPercentage
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                kdb_luas_lantai_dasar_rasio: prev.kdb_luas_lantai_dasar_rasio || '',
-                kdb_perbandingan_manual: prev.kdb_perbandingan_manual || ''
+                kdb_luas_lantai_dasar_rasio: rasio.toFixed(3),
+                kdb_perbandingan_manual: (rasio * 100).toFixed(2)
             }));
         }
-    }, [dataPrefill.kdb_luas_lantai_dasar, dataPrefill.luas_dikuasai, setFormData]);
 
-    // Kalkulasi Otomatis KLB
-    useEffect(() => {
-        const luasSeluruhLantaiStr = dataPrefill.klb_luas_seluruh_lantai;
-        const luasTanahStr = formData.klb_luas_tanah;
-        const sanitizedLuasTanahStr = String(luasTanahStr ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, '');
-        const luasSeluruhLantai = parseFloat(luasSeluruhLantaiStr);
-        const luasTanah = parseFloat(sanitizedLuasTanahStr);
+        // KLB
+        const luasSeluruhLantai = parseFloat(dataPrefill.klb_luas_seluruh_lantai);
+        const luasTanahKlb = parseFloat(String(formData.klb_luas_tanah ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, ''));
+        if (!isNaN(luasSeluruhLantai) && !isNaN(luasTanahKlb) && luasTanahKlb > 0) {
+            setFormData(prev => ({ ...prev, klb_luas_seluruh_lantai_rasio: (luasSeluruhLantai / luasTanahKlb).toFixed(3) }));
+        }
 
-        if (!isNaN(luasSeluruhLantai) && !isNaN(luasTanah) && luasTanah > 0) {
-            const rasio = luasSeluruhLantai / luasTanah;
-            const formattedRasio = rasio.toFixed(3);
+        // KDH
+        const luasVegetasi = parseFloat(dataPrefill.kdh_vegetasi);
+        const luasTanahKdh = parseFloat(String(formData.kdh_luas_tanah ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, ''));
+        if (!isNaN(luasVegetasi) && !isNaN(luasTanahKdh) && luasTanahKdh > 0) {
+            const rasio = luasVegetasi / luasTanahKdh;
             setFormData(prev => ({
                 ...prev,
-                klb_luas_seluruh_lantai_rasio: formattedRasio
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                klb_luas_seluruh_lantai_rasio: ''
+                kdh_rasio_manual: rasio.toFixed(3),
+                kdh_perbandingan_manual: (rasio * 100).toFixed(2)
             }));
         }
-    }, [dataPrefill.klb_luas_seluruh_lantai, formData.klb_luas_tanah, setFormData]);
-
-    // Kalkulasi Otomatis KDH
-    useEffect(() => {
-        const luasVegetasiStr = dataPrefill.kdh_vegetasi;
-        const luasTanahStr = formData.kdh_luas_tanah;
-        const sanitizedLuasTanahStr = String(luasTanahStr ?? '').replace(/,/g, '.').replace(/[^0-9.]/g, '');
-        const luasVegetasi = parseFloat(luasVegetasiStr);
-        const luasTanah = parseFloat(sanitizedLuasTanahStr);
-
-        if (!isNaN(luasVegetasi) && !isNaN(luasTanah) && luasTanah > 0) {
-            const rasio = luasVegetasi / luasTanah;
-            const percentage = rasio * 100;
-            const formattedRasio = rasio.toFixed(3);
-            const formattedPercentage = percentage.toFixed(2);
-            setFormData(prev => ({
-                ...prev,
-                kdh_rasio_manual: formattedRasio,
-                kdh_perbandingan_manual: formattedPercentage
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                kdh_rasio_manual: '',
-                kdh_perbandingan_manual: ''
-            }));
-        }
-    }, [dataPrefill.kdh_vegetasi, formData.kdh_luas_tanah, setFormData]);
+    }, [dataPrefill, formData.klb_luas_tanah, formData.kdh_luas_tanah, isReadOnly]);
 
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     }, []); 
 
-    const handleBlur = useCallback((e) => {
-        // No action on blur
-    }, []);
+    const handleBlur = useCallback((e) => { }, []);
     
     const timPenilai = useMemo(() => {
         if (!kasus || !kasus.tim || !kasus.tim.users) return [];
         return kasus.tim.users;
     }, [kasus]);
     
-    // Handler Submit Form
+    // --- Handler Aksi ---
+
+    const handleEditClick = () => {
+        setIsReadOnly(false);
+    };
+
+    const handleCancelClick = () => {
+        // Kembalikan data ke posisi awal (saved state)
+        if (initialData) {
+            setFormData(initialData);
+        }
+        setIsReadOnly(true);
+    };
+
+    const handlePrintClick = () => {
+        window.print();
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitLoading(true);
@@ -427,11 +481,8 @@ export default function FormulirAnalisisPage() {
         const numericKeywords = ['rasio', 'manual', 'luas_tanah', 'ketentuan_rtr'];
         
         for (const key in sanitizedFormData) {
-            if (key === 'jenis_ketentuan_rtr') {
-                continue;
-            }
-            const isNumericField = numericKeywords.some(keyword => key.includes(keyword));
-            if (isNumericField) {
+            if (key === 'jenis_ketentuan_rtr') continue;
+            if (numericKeywords.some(keyword => key.includes(keyword))) {
                 sanitizedFormData[key] = sanitizeNumericValue(sanitizedFormData[key]);
             }
         }
@@ -439,33 +490,19 @@ export default function FormulirAnalisisPage() {
         setFormData(sanitizedFormData);
 
         const signatureData = [];
-        let allSigned = true;
-
+        // Logic Tanda Tangan: Gabungkan TTD canvas baru dengan TTD lama
         for (const member of timPenilai) {
             const sigCanvas = signatureRefs.current[member.id];
             const isCanvasEmpty = !sigCanvas || sigCanvas.isEmpty();
             const existingSignature = formData.tanda_tangan_tim.find(sig => sig.user_id === member.id);
 
-            if (isCanvasEmpty && !existingSignature) {
-                allSigned = false;
-                break;
-            } else if (!isCanvasEmpty) {
-                signatureData.push({
-                    user_id: member.id,
-                    signature: sigCanvas.toDataURL(),
-                });
+            if (!isCanvasEmpty) {
+                // Priority 1: Canvas baru
+                signatureData.push({ user_id: member.id, signature: sigCanvas.toDataURL() });
             } else if (existingSignature) {
-                signatureData.push({
-                    user_id: member.id,
-                    signature: existingSignature.signature,
-                });
+                // Priority 2: TTD lama
+                signatureData.push({ user_id: member.id, signature: existingSignature.signature });
             }
-        }
-
-        if (timPenilai.length > 0 && !allSigned) {
-            setError('Semua anggota tim penilai (Ketua, Koordinator, Petugas) harus menandatangani formulir ini.');
-            setSubmitLoading(false);
-            return;
         }
         
         const payload = {
@@ -483,7 +520,14 @@ export default function FormulirAnalisisPage() {
         try {
             await api.post(`/formulir-analisis/${penilaian.id}`, payload);
             alert('Formulir Analisis berhasil disimpan!');
-            navigate(`/penilaian`);
+            
+            // Update initial data dengan data baru dan set ke read-only
+            setInitialData(formData); 
+            setDataExists(true);
+            setIsReadOnly(true);
+            
+            // Scroll ke atas
+            window.scrollTo(0, 0);
         } catch (err) {
             setError(err.response?.data?.message || 'Gagal menyimpan formulir.');
         } finally {
@@ -514,17 +558,68 @@ export default function FormulirAnalisisPage() {
         </>
     );
 
-    const blockHeaderClass = "bg-gray-100 font-semibold p-2 border-t-2 border-b border-gray-300";
+    const blockHeaderClass = "bg-gray-100 font-semibold p-2 border-t-2 border-b border-gray-300 print:bg-gray-200 print:border-black";
 
     return (
         <div className="bg-gray-100">
+            <PrintStyles />
+
             {/* Tombol Aksi Atas */}
-            <div className="mb-6 flex justify-between items-center print:hidden no-print px-4 py-3 bg-white shadow-sm sm:px-6 lg:px-8">
+            <div className="mb-6 flex justify-between items-center no-print px-4 py-3 bg-white shadow-sm sm:px-6 lg:px-8 action-bar">
                 <Link to="/penilaian" className="text-blue-600 hover:underline">&larr; Kembali ke Dashboard Penilaian</Link>
+                <div className="flex space-x-3">
+                    {/* Jika Data Ada (Mode Baca/Preview) */}
+                    {isReadOnly && dataExists && (
+                        <>
+                            <button 
+                                onClick={handlePrintClick} 
+                                className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
+                            >
+                                Print PDF
+                            </button>
+                            <button 
+                                onClick={handleEditClick} 
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
+                            >
+                                Edit Data
+                            </button>
+                        </>
+                    )}
+                    
+                    {/* Jika Mode Edit Aktif (dan data sudah ada sebelumnya) */}
+                    {!isReadOnly && dataExists && (
+                        <button 
+                            onClick={handleCancelClick} 
+                            className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
+                        >
+                            Batal Edit
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Area Form */}
             <div className="printable-area max-w-6xl mx-auto bg-white rounded-lg shadow-lg mb-8">
+                
+                {/* Banner Mode Edit */}
+                {!isReadOnly && dataExists && (
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 no-print">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                {/* Icon warning */}
+                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm text-yellow-700">
+                                    Anda sedang dalam <strong>Mode Edit</strong>. Silakan ubah data dan klik "Simpan Perubahan" di bawah.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6">
                     {/* Header */}
                     <div className="text-center pt-2">
@@ -568,7 +663,7 @@ export default function FormulirAnalisisPage() {
                                         <TableCell><ReadOnlyInput value={dataPrefill.lokasi_pmp} className="whitespace-pre-wrap" /></TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.lokasi_eksisting} className="whitespace-pre-wrap" /></TableCell>
                                         <TableCell>
-                                            <SelectInput name="lokasi_kesesuaian_pmp_eksisting" value={formData.lokasi_kesesuaian_pmp_eksisting} onChange={handleChange}>
+                                            <SelectInput name="lokasi_kesesuaian_pmp_eksisting" value={formData.lokasi_kesesuaian_pmp_eksisting} onChange={handleChange} disabled={isReadOnly}>
                                                 {dropdownSesuai}
                                             </SelectInput>
                                         </TableCell>
@@ -600,15 +695,15 @@ export default function FormulirAnalisisPage() {
                                         <TableCell><ReadOnlyInput value={dataPrefill.jenis_pmp} /></TableCell>
                                         <TableCell><ReadOnlyInput value={dataPrefill.jenis_eksisting} /></TableCell>
                                         <TableCell>
-                                            <SelectInput name="jenis_kesesuaian_pmp_eksisting" value={formData.jenis_kesesuaian_pmp_eksisting} onChange={handleChange}>
+                                            <SelectInput name="jenis_kesesuaian_pmp_eksisting" value={formData.jenis_kesesuaian_pmp_eksisting} onChange={handleChange} disabled={isReadOnly}>
                                                 {dropdownSesuai}
                                             </SelectInput>
                                         </TableCell>
                                         <TableCell>
-                                            <ManualInput name="jenis_ketentuan_rtr" value={formData.jenis_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="Input ketentuan RTR..." />
+                                            <ManualInput name="jenis_ketentuan_rtr" value={formData.jenis_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="Input ketentuan RTR..." disabled={isReadOnly} />
                                         </TableCell>
                                         <TableCell>
-                                            <SelectInput name="jenis_kesesuaian_rtr" value={formData.jenis_kesesuaian_rtr} onChange={handleChange}>
+                                            <SelectInput name="jenis_kesesuaian_rtr" value={formData.jenis_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>
                                                 {dropdownSesuai}
                                             </SelectInput>
                                         </TableCell>
@@ -655,11 +750,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell rowSpan={2} className="border-r">
                                             <InputWithUnit>
-                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah" />
+                                                <ManualInput name="luas_digunakan_ketentuan_rtr" value={formData.luas_digunakan_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} title="Ketentuan RTR Luas Tanah" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell rowSpan={2}>
-                                            <SelectInput name="luas_tanah_kesesuaian_rtr" value={formData.luas_tanah_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="luas_tanah_kesesuaian_rtr" value={formData.luas_tanah_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
@@ -687,11 +782,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell rowSpan={4}>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 60" type="text"/>
+                                                <ManualInput name="kdb_ketentuan_rtr" value={formData.kdb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 60" type="text" disabled={isReadOnly}/>
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell rowSpan={4}>
-                                            <SelectInput name="kdb_kesesuaian_rtr" value={formData.kdb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="kdb_kesesuaian_rtr" value={formData.kdb_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
@@ -739,11 +834,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell rowSpan={4}>
                                             <InputWithUnit>
-                                                <ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 1.2" type="text" />
+                                                <ManualInput name="klb_ketentuan_rtr" value={formData.klb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 1.2" type="text" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell rowSpan={4}>
-                                            <SelectInput name="klb_kesesuaian_rtr" value={formData.klb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="klb_kesesuaian_rtr" value={formData.klb_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
@@ -758,7 +853,7 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" />
+                                                <ManualInput name="klb_luas_tanah" value={formData.klb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KLB" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                     </tr>
@@ -789,11 +884,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
-                                                <ManualInput name="ketinggian_ketentuan_rtr" value={formData.ketinggian_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 8" type="text" />
+                                                <ManualInput name="ketinggian_ketentuan_rtr" value={formData.ketinggian_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 8" type="text" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
-                                            <SelectInput name="ketinggian_kesesuaian_rtr" value={formData.ketinggian_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="ketinggian_kesesuaian_rtr" value={formData.ketinggian_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
 
@@ -813,11 +908,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell rowSpan={5}>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 20" type="text" />
+                                                <ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 20" type="text" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell rowSpan={5}>
-                                            <SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
@@ -832,7 +927,7 @@ export default function FormulirAnalisisPage() {
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" />
+                                                <ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KDH" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                     </tr>
@@ -873,19 +968,18 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell rowSpan={4}>
                                             <InputWithUnit unit="%">
-                                                <ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 50" type="text" />
+                                                <ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 50" type="text" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell rowSpan={4}>
-                                            {/* Ini adalah dropdown yang bermasalah */}
-                                            <SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange}>{dropdownKtb}</SelectInput>
+                                            <SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownKtb}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
                                         <TableCell className="pl-8">Luas Tanah</TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m²">
-                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" />
+                                                <ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} onBlur={handleBlur} placeholder="Input Luas Tanah" type="text" title="Input Luas Tanah untuk KTB" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                     </tr>
@@ -901,6 +995,7 @@ export default function FormulirAnalisisPage() {
                                                     onBlur={handleBlur}
                                                     placeholder="Rasio (cth: 0.5)"
                                                     title="Input Manual: Luas Tapak Basemen : Luas Tanah"
+                                                    disabled={isReadOnly}
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
@@ -917,6 +1012,7 @@ export default function FormulirAnalisisPage() {
                                                     onBlur={handleBlur}
                                                     placeholder="cth: 50"
                                                     title="Input Manual: Perbandingan (x100%)"
+                                                    disabled={isReadOnly}
                                                 />
                                             </InputWithUnit>
                                         </TableCell>
@@ -939,11 +1035,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell>
                                             <InputWithUnit unit="m">
-                                                <ManualInput name="gsb_ketentuan_rtr" value={formData.gsb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 4" type="text" />
+                                                <ManualInput name="gsb_ketentuan_rtr" value={formData.gsb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 4" type="text" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell>
-                                            <SelectInput name="gsb_kesesuaian_rtr" value={formData.gsb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="gsb_kesesuaian_rtr" value={formData.gsb_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     
@@ -963,11 +1059,11 @@ export default function FormulirAnalisisPage() {
                                         </TableCell>
                                         <TableCell rowSpan={2} className="border-r">
                                             <InputWithUnit unit="m">
-                                                <ManualInput name="jbb_ketentuan_rtr" value={formData.jbb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 3" type="text" />
+                                                <ManualInput name="jbb_ketentuan_rtr" value={formData.jbb_ketentuan_rtr} onChange={handleChange} onBlur={handleBlur} placeholder="cth: 3" type="text" disabled={isReadOnly} />
                                             </InputWithUnit>
                                         </TableCell>
                                         <TableCell rowSpan={2}>
-                                            <SelectInput name="jbb_kesesuaian_rtr" value={formData.jbb_kesesuaian_rtr} onChange={handleChange}>{dropdownSesuai}</SelectInput>
+                                            <SelectInput name="jbb_kesesuaian_rtr" value={formData.jbb_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput>
                                         </TableCell>
                                     </tr>
                                     <tr>
@@ -995,6 +1091,7 @@ export default function FormulirAnalisisPage() {
                                         signaturePath={formData.tanda_tangan_tim.find(sig => sig.user_id === member.id)?.signature}
                                         signatureRefs={signatureRefs}
                                         memberId={member.id}
+                                        isReadOnly={isReadOnly}
                                     />
                                 ))
                             ) : (
@@ -1010,15 +1107,28 @@ export default function FormulirAnalisisPage() {
                             <p>{error}</p>
                         </div>
                     )}
-                    <div className="flex justify-end pt-4 print:hidden no-print">
-                        <button 
-                            type="submit" 
-                            disabled={submitLoading} 
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md disabled:bg-blue-400"
-                        >
-                            {submitLoading ? 'Menyimpan...' : 'Simpan Formulir Analisis'}
-                        </button>
-                    </div>
+                    
+                    {/* Tombol Aksi Bawah - Hanya muncul saat mode EDIT/INPUT */}
+                    {!isReadOnly && (
+                        <div className="flex justify-end pt-4 print:hidden no-print space-x-3">
+                            {dataExists && (
+                                <button 
+                                    type="button"
+                                    onClick={handleCancelClick}
+                                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md"
+                                >
+                                    Batal
+                                </button>
+                            )}
+                            <button 
+                                type="submit" 
+                                disabled={submitLoading} 
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md disabled:bg-blue-400"
+                            >
+                                {submitLoading ? 'Menyimpan...' : (dataExists ? 'Simpan Perubahan' : 'Simpan Formulir')}
+                            </button>
+                        </div>
+                    )}
 
                 </form>
             </div>
