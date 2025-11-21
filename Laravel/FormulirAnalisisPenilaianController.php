@@ -21,8 +21,6 @@ class FormulirAnalisisPenilaianController extends Controller
         $formulir = FormulirAnalisisPenilaian::where('penilaian_id', $penilaian->id)->first();
         
         if (!$formulir) {
-            // --- MODIFIKASI: Kirim 404 jika tidak ditemukan ---
-            // Ini akan ditangani oleh blok catch di frontend
             return response()->json(['message' => 'Formulir analisis belum ada.'], 404);
         }
 
@@ -45,22 +43,27 @@ class FormulirAnalisisPenilaianController extends Controller
             'luas_dikuasai_kesesuaian_rtr' => 'nullable|string',
             'kdb_ketentuan_rtr' => 'nullable|string',
             'kdb_kesesuaian_rtr' => 'nullable|string',
-            'kdb_rasio_manual' => 'nullable|string', // BARU
-            'kdb_persen_manual' => 'nullable|string', // BARU
+            'kdb_rasio_manual' => 'nullable|string',
+            'kdb_persen_manual' => 'nullable|string',
             'klb_luas_tanah' => 'nullable|string',
             'klb_ketentuan_rtr' => 'nullable|string',
             'klb_kesesuaian_rtr' => 'nullable|string',
-            'klb_rasio_manual' => 'nullable|string', // BARU
+            'klb_rasio_manual' => 'nullable|string',
+            
+            // PERBAIKAN: Menambahkan validasi untuk Ketinggian Bangunan
+            'ketinggian_ketentuan_rtr' => 'nullable|string',
+            'ketinggian_kesesuaian_rtr' => 'nullable|string',
+
             'kdh_luas_tanah' => 'nullable|string',
             'kdh_perbandingan_vegetasi' => 'nullable|string',
             'kdh_ketentuan_rtr' => 'nullable|string',
             'kdh_kesesuaian_rtr' => 'nullable|string',
-            'kdh_rasio_manual' => 'nullable|string', // BARU
+            'kdh_rasio_manual' => 'nullable|string',
             'ktb_luas_tanah' => 'nullable|string',
             'ktb_ketentuan_rtr' => 'nullable|string',
             'ktb_kesesuaian_rtr' => 'nullable|string',
-            'ktb_rasio_manual' => 'nullable|string', // BARU
-            'ktb_persen_manual' => 'nullable|string', // BARU
+            'ktb_rasio_manual' => 'nullable|string',
+            'ktb_persen_manual' => 'nullable|string',
             'gsb_ketentuan_rtr' => 'nullable|string',
             'gsb_kesesuaian_rtr' => 'nullable|string',
             'jbb_ketentuan_rtr' => 'nullable|string',
@@ -122,7 +125,7 @@ class FormulirAnalisisPenilaianController extends Controller
     }
 
     /**
-     * Fungsi helper untuk menyimpan tanda tangan base64 (copy dari PenilaianController)
+     * Fungsi helper untuk menyimpan tanda tangan base64
      */
     private function saveSignature($base64Image, $prefix)
     {
@@ -149,7 +152,6 @@ class FormulirAnalisisPenilaianController extends Controller
              throw new \RuntimeException("Gagal menyimpan file tanda tangan ke disk: {$fullPath}");
         }
         
-        // Kembalikan HANYA nama filenya
         return $fileOnlyName;
     }
 }
