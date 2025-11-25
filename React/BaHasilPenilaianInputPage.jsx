@@ -190,6 +190,12 @@ export default function BaHasilPenilaianInputPage() {
         });
     };
 
+    // Helper untuk menangani error gambar
+    const handleImageError = (e) => {
+        e.target.style.display = 'none';
+        e.target.parentElement.innerText = 'Gambar tidak dimuat (Error)';
+    };
+
     if (loading) return <div className="text-center py-10">Memuat Formulir...</div>;
     if (!data) return <div className="text-center py-10 text-red-500">Data tidak ditemukan</div>;
 
@@ -316,6 +322,8 @@ export default function BaHasilPenilaianInputPage() {
                                                     src={`${api.defaults.baseURL}/signatures/${existingSigUrl}`} 
                                                     alt="Tanda Tangan Tersimpan" 
                                                     className="max-h-full max-w-full"
+                                                    crossOrigin="anonymous" // PERBAIKAN: Tambah crossOrigin
+                                                    onError={handleImageError}
                                                 />
                                                 <div className="absolute top-0 right-0 p-1">
                                                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Tersimpan</span>

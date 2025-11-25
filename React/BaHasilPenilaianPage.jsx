@@ -103,6 +103,11 @@ export default function BaHasilPenilaianPage() {
         </tr>
     );
 
+    // Helper handle image error
+    const handleImageError = (e) => {
+        e.target.style.display = 'none';
+    };
+
     if (loading) return <div className="text-center py-10">Memuat Dokumen...</div>;
     if (error) return <div className="bg-red-100 text-red-700 p-4 m-4 rounded">{error}</div>;
 
@@ -273,6 +278,8 @@ export default function BaHasilPenilaianPage() {
                                     src={`${api.defaults.baseURL}/signatures/${analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Petugas Lapangan'))?.signature_path}`} 
                                     alt="TTD" 
                                     className="h-20 object-contain"
+                                    crossOrigin="anonymous" // PERBAIKAN: Tambah crossOrigin
+                                    onError={handleImageError}
                                 />
                             ) : (
                                 <div className="h-20 w-full"></div>
@@ -301,6 +308,8 @@ export default function BaHasilPenilaianPage() {
                                     src={`${api.defaults.baseURL}/signatures/${analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Ketua Tim'))?.signature_path}`} 
                                     alt="TTD" 
                                     className="h-20 object-contain"
+                                    crossOrigin="anonymous" // PERBAIKAN: Tambah crossOrigin
+                                    onError={handleImageError}
                                 />
                             ) : (
                                 <div className="h-20 w-full"></div>

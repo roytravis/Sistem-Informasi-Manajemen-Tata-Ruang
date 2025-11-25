@@ -50,6 +50,15 @@ export default function BaHasilPenilaianPreviewPage() {
         thn: dateObj.getFullYear()
     };
 
+    // Helper untuk menangani error gambar (fallback)
+    const handleImageError = (e) => {
+        e.target.style.display = 'none'; // Sembunyikan gambar rusak
+        // Atau ganti src dengan placeholder: e.target.src = '/placeholder.png';
+        // Tampilkan teks fallback di parent div jika perlu
+        e.target.parentElement.innerText = '(Gagal Memuat)';
+        e.target.parentElement.classList.add('text-xs', 'text-red-500');
+    };
+
     return (
         <div className="bg-gray-100 min-h-screen pb-10">
             {/* Styles khusus print */}
@@ -154,6 +163,8 @@ export default function BaHasilPenilaianPreviewPage() {
                                             src={`${api.defaults.baseURL}/signatures/${sig.signature_path}`} 
                                             alt="TTD" 
                                             className="h-full object-contain"
+                                            crossOrigin="anonymous" // PERBAIKAN UTAMA DI SINI
+                                            onError={handleImageError} // Tangani jika gambar error
                                         />
                                     )}
                                 </div>
