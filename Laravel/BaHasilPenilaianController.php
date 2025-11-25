@@ -7,13 +7,14 @@ use App\Models\BaHasilPenilaian;
 use App\Models\Penilaian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class BaHasilPenilaianController extends Controller
 {
     /**
-     * Menampilkan data untuk halaman Berita Acara Hasil Penilaian.
-     * Mengambil data dari Penilaian, Kasus, Pemegang, Tim, Formulir Analisis, dan BA Hasil (jika ada).
+     * Menampilkan data untuk Form Input atau Preview.
      */
     public function show($penilaianId)
     {
@@ -25,6 +26,7 @@ class BaHasilPenilaianController extends Controller
             'baHasilPenilaian'
         ])->findOrFail($penilaianId);
 
+        // Validasi: Formulir Analisis harus ada
         if (!$penilaian->formulirAnalisis) {
             return response()->json(['message' => 'Formulir Analisis belum dibuat. Harap selesaikan analisis terlebih dahulu.'], 400);
         }
@@ -33,30 +35,57 @@ class BaHasilPenilaianController extends Controller
     }
 
     /**
-     * Menyimpan atau memperbarui Berita Acara Hasil Penilaian (Kesimpulan).
+     * Menyimpan Berita Acara Hasil Penilaian baru.
      */
     public function store(Request $request)
     {
         $request->validate([
             'penilaian_id' => 'required|exists:penilaians,id',
+            'tanggal_ba' => 'required|date',
             'validitas_kegiatan' => 'required|in:BENAR,TIDAK BENAR',
-            'rekomendasi_lanjutan' => 'required|in:Melanjutkan kegiatan Pemanfaatan Ruang,Dilakukan pembinaan sesuai ketentuan peraturan perundang-undangan',
+            'rekomendasi_lanjutan' => 'required|string',
+            'signatures' => 'required|array', // Array of signatures from frontend
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Generate Nomor BA jika belum ada (Format contoh: BA-HP/TIMESTAMP/RANDOM)
+            // 1. Generate Nomor BA (Contoh Format)
             $nomorBa = 'BA-HP/' . now()->format('Ymd') . '/' . strtoupper(Str::random(4));
 
+            // 2. Proses Tanda Tangan
+            $processedSignatures = [];
+            foreach ($request->signatures as $sig) {
+                $path = null;
+                
+                // Cek apakah signature berupa base64 image baru
+                if (!empty($sig['signature_data']) && Str::startsWith($sig['signature_data'], 'data:image')) {
+                    $path = $this->saveSignature($sig['signature_data'], 'ttd_bahp_' . Str::slug($sig['role']));
+                } elseif (!empty($sig['existing_path'])) {
+                    // Gunakan path lama jika ada (misal dari re-save)
+                    $path = $sig['existing_path'];
+                }
+
+                $processedSignatures[] = [
+                    'role' => $sig['role'],
+                    'nama' => $sig['nama'],
+                    'nip' => $sig['nip'],
+                    'jabatan' => $sig['jabatan'],
+                    'signature_path' => $path
+                ];
+            }
+
+            // 3. Simpan Data
             $baHasil = BaHasilPenilaian::updateOrCreate(
                 ['penilaian_id' => $request->penilaian_id],
                 [
-                    'nomor_ba' => $request->nomor_ba ?? $nomorBa, // Gunakan existing jika update, atau baru
-                    'tanggal_ba' => now(),
+                    'nomor_ba' => $request->nomor_ba ?? $nomorBa, 
+                    'tanggal_ba' => $request->tanggal_ba,
                     'validitas_kegiatan' => $request->validitas_kegiatan,
                     'rekomendasi_lanjutan' => $request->rekomendasi_lanjutan,
-                    // Snapshot petugas bisa ditambahkan logicnya disini jika perlu menyimpan state static
+                    'tanda_tangan_tim' => $processedSignatures,
+                    // Simpan snapshot statis data petugas untuk keperluan arsip
+                    'snapshot_petugas' => $processedSignatures, 
                 ]
             );
 
@@ -65,7 +94,33 @@ class BaHasilPenilaianController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error("Error saving BA Hasil Penilaian: " . $e->getMessage());
             return response()->json(['message' => 'Gagal menyimpan Berita Acara: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Helper: Simpan base64 ke file
+     */
+    private function saveSignature($base64Image, $prefix)
+    {
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
+            $data = substr($base64Image, strpos($base64Image, ',') + 1);
+            $type = strtolower($type[1]);
+
+            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
+                throw new \Exception('Tipe gambar tidak valid');
+            }
+            $data = base64_decode($data);
+            if ($data === false) {
+                throw new \Exception('Gagal decode base64');
+            }
+        } else {
+            throw new \Exception('Format data URI tidak valid');
+        }
+
+        $fileName = 'signatures/' . $prefix . '_' . Str::uuid() . '.' . $type;
+        Storage::disk('public')->put($fileName, $data);
+        return $fileName;
     }
 }

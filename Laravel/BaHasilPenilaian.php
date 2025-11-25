@@ -17,11 +17,13 @@ class BaHasilPenilaian extends Model
         'tanggal_ba',
         'validitas_kegiatan',
         'rekomendasi_lanjutan',
+        'tanda_tangan_tim',
         'snapshot_petugas',
     ];
 
     protected $casts = [
         'tanggal_ba' => 'date',
+        'tanda_tangan_tim' => 'array',
         'snapshot_petugas' => 'array',
     ];
 
