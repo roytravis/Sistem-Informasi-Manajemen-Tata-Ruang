@@ -18,10 +18,10 @@ import EditPenilaianPage from './pages/EditPenilaianPage';
 import AddBeritaAcaraPage from './pages/AddBeritaAcaraPage';
 import BeritaAcaraPreviewPage from './pages/BeritaAcaraPreviewPage';
 import BeritaAcaraPemeriksaanPage from './pages/BeritaAcaraPemeriksaanPage';
-
-// --- PENAMBAHAN BARU UNTUK FITUR INI ---
 import FormulirAnalisisPage from './pages/FormulirAnalisisPage';
 
+// --- PENAMBAHAN IMPORT BARU ---
+import BaHasilPenilaianPage from './pages/BaHasilPenilaianPage'; 
 
 function App() {
   return (
@@ -46,15 +46,14 @@ function App() {
           <Route path="penilaian/:id/edit" element={<EditPenilaianPage />} />
           <Route path="penilaian/:id" element={<PenilaianDetailPage />} />
           
-          {/* Rute Berita Acara (Tidak Terlaksana) */}
           <Route path="penilaian/berita-acara/tambah" element={<AddBeritaAcaraPage />} />
           <Route path="penilaian/berita-acara/:id/preview" element={<BeritaAcaraPreviewPage />} />
-
-          {/* Rute Berita Acara Pemeriksaan (Selesai Dinilai) */}
           <Route path="penilaian/:id/berita-acara-pemeriksaan" element={<BeritaAcaraPemeriksaanPage />} />
-
-          {/* --- PENAMBAHAN RUTE BARU: Formulir Analisis --- */}
           <Route path="penilaian/:id/formulir-analisis" element={<FormulirAnalisisPage />} />
+
+          {/* --- RUTE BARU: Berita Acara Hasil Penilaian --- */}
+          {/* Note: :id disini adalah PENILAIAN ID */}
+          <Route path="penilaian/:id/ba-hasil" element={<BaHasilPenilaianPage />} />
         </Route>
       </Route>
     </Routes>
