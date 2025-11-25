@@ -45,13 +45,19 @@ class BaHasilPenilaianController extends Controller
             'validitas_kegiatan' => 'required|in:BENAR,TIDAK BENAR',
             'rekomendasi_lanjutan' => 'required|string',
             'signatures' => 'required|array', // Array of signatures from frontend
+            'nomor_ba' => 'nullable|string|max:255', // Validasi input nomor_ba (nullable)
         ]);
 
         try {
             DB::beginTransaction();
 
-            // 1. Generate Nomor BA (Contoh Format)
-            $nomorBa = 'BA-HP/' . now()->format('Ymd') . '/' . strtoupper(Str::random(4));
+            // 1. Generate Nomor BA (Jika tidak diinput manual oleh user)
+            // Logic: Jika request->nomor_ba ada dan tidak kosong, gunakan itu. Jika tidak, generate.
+            $finalNomorBa = $request->nomor_ba;
+            if (empty($finalNomorBa)) {
+                // Format: BA-HP/YYYYMMDD/XXXX (Random 4 char)
+                $finalNomorBa = 'BA-HP/' . now()->format('Ymd') . '/' . strtoupper(Str::random(4));
+            }
 
             // 2. Proses Tanda Tangan
             $processedSignatures = [];
@@ -75,11 +81,11 @@ class BaHasilPenilaianController extends Controller
                 ];
             }
 
-            // 3. Simpan Data
+            // 3. Simpan Data (Update atau Create)
             $baHasil = BaHasilPenilaian::updateOrCreate(
                 ['penilaian_id' => $request->penilaian_id],
                 [
-                    'nomor_ba' => $request->nomor_ba ?? $nomorBa, 
+                    'nomor_ba' => $finalNomorBa, // Gunakan nomor yang sudah difinalisasi
                     'tanggal_ba' => $request->tanggal_ba,
                     'validitas_kegiatan' => $request->validitas_kegiatan,
                     'rekomendasi_lanjutan' => $request->rekomendasi_lanjutan,
