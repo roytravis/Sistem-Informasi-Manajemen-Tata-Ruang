@@ -13,14 +13,18 @@ return new class extends Migration
             // Relasi ke Penilaian (One-to-One)
             $table->foreignId('penilaian_id')->constrained('penilaians')->onDelete('cascade');
             
-            $table->string('nomor_ba')->nullable(); // Bisa digenerate otomatis atau input
+            $table->string('nomor_ba')->nullable(); 
             $table->date('tanggal_ba');
             
-            // D. Kesimpulan Penilaian
-            $table->string('validitas_kegiatan')->nullable(); // BENAR / TIDAK BENAR
-            $table->string('rekomendasi_lanjutan')->nullable(); // Melanjutkan / Pembinaan
+            // Kesimpulan
+            $table->string('validitas_kegiatan'); // BENAR / TIDAK BENAR
+            $table->string('rekomendasi_lanjutan'); // Melanjutkan / Pembinaan
             
-            // Menyimpan snapshot data petugas saat BA dibuat (opsional, agar historis aman)
+            // Tanda Tangan Tim (Petugas, Koordinator, Ketua Tim)
+            // Format JSON: [{ "role": "Petugas Lapangan", "nama": "...", "nip": "...", "signature_path": "..." }, ...]
+            $table->json('tanda_tangan_tim')->nullable();
+
+            // Snapshot data petugas saat BA dibuat (agar historis aman jika user berubah jabatan)
             $table->json('snapshot_petugas')->nullable();
 
             $table->timestamps();
