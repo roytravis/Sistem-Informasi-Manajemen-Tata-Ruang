@@ -393,26 +393,38 @@ class PenilaianController extends Controller
         // --- AKHIR PERBAIKAN ---
     }
 
-    // --- FUNGSI BARU UNTUK MENGAMBIL GAMBAR ---
+    // --- PERBAIKAN FUNGSI GET SIGNATURE IMAGE (SOLUSI ORB) ---
     /**
      * Mengambil file gambar tanda tangan dari storage.
+     * PENTING: Jika file tidak ditemukan, JANGAN kembalikan JSON (response 404 default Laravel API).
+     * Kembalikan 404 abort biasa atau gambar placeholder. Ini mencegah error ORB di browser.
      */
     public function getSignatureImage($filename)
     {
         $path = 'signatures/' . $filename;
-        // Dapatkan path fisik lengkap ke file di dalam storage/app/public
         $storagePath = Storage::disk('public')->path($path);
 
-        // Gunakan File::exists untuk mengecek path fisik
+        // Cek apakah file ada secara fisik
         if (!File::exists($storagePath)) {
             Log::warning("Signature file not found at path: {$storagePath}");
-            return response()->json(['message' => 'File tidak ditemukan.'], 404);
+            // CRITICAL FIX: Gunakan abort(404) yang tidak mengembalikan JSON,
+            // atau return response kosong. Jangan return response()->json()!
+            abort(404); 
         }
 
         Log::info("Serving signature file from path: {$storagePath}");
 
-        // response()->file() secara otomatis menangani header Content-Type dan Content-Length
-        return response()->file($storagePath);
+        // Pastikan header yang benar dikirim
+        $file = File::get($storagePath);
+        $type = File::mimeType($storagePath);
+
+        $response = Response::make($file, 200);
+        $response->header("Content-Type", $type);
+        
+        // Tambahkan header CORS jika perlu (biasanya ditangani middleware, tapi ini eksplisit)
+        $response->header("Access-Control-Allow-Origin", "*"); 
+
+        return $response;
     }
     // --- AKHIR FUNGSI BARU ---
 }
