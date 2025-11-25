@@ -49,12 +49,6 @@ export default function BaHasilPenilaianInputPage() {
                     // Mapping TTD lama
                     const signaturesMap = {};
                     if (ba.tanda_tangan_tim && Array.isArray(ba.tanda_tangan_tim)) {
-                        // Kita perlu mencocokkan user dari tim dengan signature yang tersimpan
-                        // Karena di DB tersimpan nama/role, kita perlu mapping balik ke ID jika memungkinkan,
-                        // atau backend mengirim struktur yang memiliki user_id (tergantung implementasi controller save).
-                        // Di controller 'store', kita menyimpan array objek dengan role, nama, nip, jabatan, signature_path.
-                        // Kita perlu mencocokkan berdasarkan NIP atau Nama untuk mengetahui milik siapa TTD tersebut.
-                        
                         // Ambil data tim dari response
                         const timMembers = getTimMembersFromData(result);
                         
@@ -168,7 +162,7 @@ export default function BaHasilPenilaianInputPage() {
         try {
             await api.post('/ba-hasil-penilaian', {
                 penilaian_id: penilaianId,
-                nomor_ba: formData.nomor_ba, // Kirim nomor BA jika ingin mempertahankan yang lama
+                nomor_ba: formData.nomor_ba, // Kirim nomor BA (bisa string kosong jika user ingin generate baru)
                 tanggal_ba: formData.tanggal_ba,
                 validitas_kegiatan: formData.validitas_kegiatan,
                 rekomendasi_lanjutan: formData.rekomendasi_lanjutan,
@@ -241,6 +235,22 @@ export default function BaHasilPenilaianInputPage() {
                     <h3 className="font-semibold text-blue-800 mb-4">C. Kesimpulan & Rekomendasi (Wajib Diisi)</h3>
                     
                     <div className="grid grid-cols-1 gap-6">
+                        {/* INPUT NOMOR BA (MANUAL) */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Berita Acara</label>
+                            <input 
+                                type="text" 
+                                name="nomor_ba" 
+                                value={formData.nomor_ba} 
+                                onChange={handleChange}
+                                placeholder="Masukkan Nomor BA (Biarkan kosong untuk Generate Otomatis)"
+                                className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                *Jika dikosongkan, sistem akan membuat nomor otomatis (format: BA-HP/YYYYMMDD/XXXX).
+                            </p>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Berita Acara</label>
                             <input 
