@@ -12,8 +12,9 @@ use App\Models\Pemegang;
 use App\Models\User;
 use App\Http\Controllers\Api\BeritaAcaraController;
 use App\Http\Controllers\Api\BaPemeriksaanController;
-// --- PENAMBAHAN BARU ---
 use App\Http\Controllers\Api\FormulirAnalisisPenilaianController;
+// --- PENAMBAHAN BARU ---
+use App\Http\Controllers\Api\BaHasilPenilaianController;
 // --- AKHIR PENAMBAHAN ---
 
 // Rute publik untuk login dan register
@@ -100,5 +101,10 @@ Route::middleware('auth:sanctum')->group(function () {
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
     Route::post('/formulir-analisis/{penilaian}', [FormulirAnalisisPenilaianController::class, 'store'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
-    // --- AKHIR PENAMBAHAN ---
+         
+    // --- RUTE BERITA ACARA HASIL PENILAIAN (BARU) ---
+    Route::get('/ba-hasil-penilaian/{penilaianId}', [BaHasilPenilaianController::class, 'show'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
+    Route::post('/ba-hasil-penilaian', [BaHasilPenilaianController::class, 'store'])
+         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
 });

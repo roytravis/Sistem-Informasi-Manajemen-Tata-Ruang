@@ -9,22 +9,15 @@ class Penilaian extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     * PERBAIKAN: Sesuaikan dengan skema baru untuk tanda tangan tim.
-     */
     protected $fillable = [
         'kasus_id',
         'desk_study',
         'pemeriksaan',
         'pengukuran',
         'catatan',
-        'tanda_tangan_tim', // Menggantikan 'penilai_id' dan 'tanda_tangan_petugas'
+        'tanda_tangan_tim',
     ];
 
-    /**
-     * PERBAIKAN: Cast 'tanda_tangan_tim' sebagai array.
-     */
     protected $casts = [
         'desk_study' => 'array',
         'pemeriksaan' => 'array',
@@ -37,21 +30,19 @@ class Penilaian extends Model
         return $this->belongsTo(Kasus::class);
     }
 
-    // Relasi 'penilai()' tunggal tidak lagi relevan karena penilai adalah tim.
-
-    /**
-     * PENAMBAHAN: Relasi ke Berita Acara Pemeriksaan.
-     */
     public function baPemeriksaan()
     {
         return $this->hasOne(BaPemeriksaan::class);
     }
 
-    /**
-     * PENAMBAHAN: Relasi ke Formulir Analisis Penilaian.
-     */
     public function formulirAnalisis()
     {
         return $this->hasOne(FormulirAnalisisPenilaian::class);
+    }
+
+    // --- PENAMBAHAN BARU ---
+    public function baHasilPenilaian()
+    {
+        return $this->hasOne(BaHasilPenilaian::class);
     }
 }
