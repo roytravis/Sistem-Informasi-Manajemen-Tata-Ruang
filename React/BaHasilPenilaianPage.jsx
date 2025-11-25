@@ -106,6 +106,20 @@ export default function BaHasilPenilaianPage() {
     // Helper handle image error
     const handleImageError = (e) => {
         e.target.style.display = 'none';
+        // Opsional: Tampilkan pesan error teks jika gambar gagal
+        if (e.target.parentElement) {
+            e.target.parentElement.innerText = '(Gagal Memuat)';
+            e.target.parentElement.className = "text-xs text-red-500 h-20 flex items-center justify-center border rounded";
+        }
+    };
+
+    // --- PERBAIKAN: Helper untuk mendapatkan URL gambar yang bersih ---
+    const getSignatureUrl = (path) => {
+        if (!path) return null;
+        // Ambil hanya nama file (misal: "signatures/ttd.png" -> "ttd.png")
+        // Ini mencegah URL menjadi ".../api/signatures/signatures/ttd.png" (double signatures)
+        const filename = path.split('/').pop();
+        return `${api.defaults.baseURL}/signatures/${filename}`;
     };
 
     if (loading) return <div className="text-center py-10">Memuat Dokumen...</div>;
@@ -275,7 +289,7 @@ export default function BaHasilPenilaianPage() {
                             {/* Cek TTD di Formulir Analisis */}
                             {analisis.tanda_tangan_tim && analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Petugas Lapangan')) ? (
                                 <img 
-                                    src={`${api.defaults.baseURL}/signatures/${analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Petugas Lapangan'))?.signature_path}`} 
+                                    src={getSignatureUrl(analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Petugas Lapangan'))?.signature_path)}
                                     alt="TTD" 
                                     className="h-20 object-contain"
                                     crossOrigin="anonymous" // PERBAIKAN: Tambah crossOrigin
@@ -305,7 +319,7 @@ export default function BaHasilPenilaianPage() {
                              {/* Cek TTD Ketua Tim */}
                              {analisis.tanda_tangan_tim && analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Ketua Tim')) ? (
                                 <img 
-                                    src={`${api.defaults.baseURL}/signatures/${analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Ketua Tim'))?.signature_path}`} 
+                                    src={getSignatureUrl(analisis.tanda_tangan_tim.find(s => timMembers.some(tm => tm.id === s.user_id && tm.pivot?.jabatan_di_tim === 'Ketua Tim'))?.signature_path)}
                                     alt="TTD" 
                                     className="h-20 object-contain"
                                     crossOrigin="anonymous" // PERBAIKAN: Tambah crossOrigin
