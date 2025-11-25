@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import api from '../api/axios.js';
 
 export default function BaHasilPenilaianPreviewPage() {
     const { id: penilaianId } = useParams();
+    const navigate = useNavigate(); // Hook navigasi
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -26,6 +27,12 @@ export default function BaHasilPenilaianPreviewPage() {
     }, [penilaianId]);
 
     const handlePrint = () => window.print();
+
+    // Fungsi untuk menangani klik tombol Edit
+    const handleEdit = () => {
+        // Arahkan ke halaman input dengan query param ?edit=true agar tidak di-redirect balik
+        navigate(`/penilaian/${penilaianId}/ba-hasil/input?edit=true`);
+    };
 
     if (loading) return <div className="text-center py-10">Memuat Preview...</div>;
     if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
@@ -55,7 +62,28 @@ export default function BaHasilPenilaianPreviewPage() {
                 }
             `}</style>
 
-            <div className="max-w-[21cm] mx-auto bg-white shadow-lg p-8 md:p-12 mt-6 printable-area font-serif text-black">
+            {/* Tombol Aksi Atas (No Print) */}
+            <div className="no-print px-4 py-4 max-w-[21cm] mx-auto flex justify-between items-center">
+                 <Link to="/penilaian" className="text-blue-600 font-medium hover:underline">
+                    &larr; Kembali ke Dashboard
+                </Link>
+                <div className="space-x-3">
+                    <button 
+                        onClick={handleEdit}
+                        className="bg-yellow-500 text-white px-4 py-2 rounded shadow font-medium hover:bg-yellow-600 transition"
+                    >
+                        Edit Data
+                    </button>
+                    <button 
+                        onClick={handlePrint}
+                        className="bg-gray-600 text-white px-4 py-2 rounded shadow font-medium hover:bg-gray-700 transition"
+                    >
+                        Cetak
+                    </button>
+                </div>
+            </div>
+
+            <div className="max-w-[21cm] mx-auto bg-white shadow-lg p-8 md:p-12 printable-area font-serif text-black">
                 {/* Header Dokumen */}
                 <div className="flex justify-between items-start mb-6 border-b-2 border-black pb-4">
                     <div className="text-center w-full">
@@ -137,7 +165,7 @@ export default function BaHasilPenilaianPreviewPage() {
                 </div>
             </div>
 
-            {/* Tombol Aksi (No Print) */}
+            {/* Tombol Aksi Bawah (No Print) - Redundant but good for UX */}
             <div className="fixed bottom-0 w-full bg-white border-t p-4 flex justify-between items-center no-print shadow-lg max-w-[21cm] mx-auto left-0 right-0">
                 <Link to="/penilaian" className="text-blue-600 font-medium hover:underline">
                     &larr; Kembali ke Dashboard
