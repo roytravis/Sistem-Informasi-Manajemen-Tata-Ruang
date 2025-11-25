@@ -20,8 +20,9 @@ import BeritaAcaraPreviewPage from './pages/BeritaAcaraPreviewPage';
 import BeritaAcaraPemeriksaanPage from './pages/BeritaAcaraPemeriksaanPage';
 import FormulirAnalisisPage from './pages/FormulirAnalisisPage';
 
-// --- PENAMBAHAN IMPORT BARU ---
-import BaHasilPenilaianPage from './pages/BaHasilPenilaianPage'; 
+// --- IMPORT HALAMAN BARU ---
+import BaHasilPenilaianInputPage from './pages/BaHasilPenilaianInputPage';
+import BaHasilPenilaianPreviewPage from './pages/BaHasilPenilaianPreviewPage';
 
 function App() {
   return (
@@ -51,9 +52,14 @@ function App() {
           <Route path="penilaian/:id/berita-acara-pemeriksaan" element={<BeritaAcaraPemeriksaanPage />} />
           <Route path="penilaian/:id/formulir-analisis" element={<FormulirAnalisisPage />} />
 
-          {/* --- RUTE BARU: Berita Acara Hasil Penilaian --- */}
-          {/* Note: :id disini adalah PENILAIAN ID */}
-          <Route path="penilaian/:id/ba-hasil" element={<BaHasilPenilaianPage />} />
+          {/* --- RUTE BERITA ACARA HASIL PENILAIAN --- */}
+          {/* Input Form */}
+          <Route path="penilaian/:id/ba-hasil/input" element={<BaHasilPenilaianInputPage />} />
+          {/* Preview Result */}
+          <Route path="penilaian/:id/ba-hasil/preview" element={<BaHasilPenilaianPreviewPage />} />
+          
+          {/* Redirect legacy route to input if needed, or just remove */}
+          <Route path="penilaian/:id/ba-hasil" element={<Navigate to="input" replace />} />
         </Route>
       </Route>
     </Routes>
