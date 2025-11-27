@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios.js';
 
 export default function BaHasilPenilaianPreviewPage() {
     const { id: penilaianId } = useParams();
-    const navigate = useNavigate(); // Hook navigasi
+    const navigate = useNavigate();
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -28,9 +28,7 @@ export default function BaHasilPenilaianPreviewPage() {
 
     const handlePrint = () => window.print();
 
-    // Fungsi untuk menangani klik tombol Edit
     const handleEdit = () => {
-        // Arahkan ke halaman input dengan query param ?edit=true agar tidak di-redirect balik
         navigate(`/penilaian/${penilaianId}/ba-hasil/input?edit=true`);
     };
 
@@ -50,18 +48,24 @@ export default function BaHasilPenilaianPreviewPage() {
         thn: dateObj.getFullYear()
     };
 
-    // Helper untuk menangani error gambar (fallback)
+    // Helper untuk menangani error gambar
     const handleImageError = (e) => {
-        e.target.style.display = 'none'; // Sembunyikan gambar rusak
-        // Atau ganti src dengan placeholder: e.target.src = '/placeholder.png';
-        // Tampilkan teks fallback di parent div jika perlu
+        e.target.style.display = 'none';
         e.target.parentElement.innerText = '(Gagal Memuat)';
         e.target.parentElement.classList.add('text-xs', 'text-red-500');
     };
 
+    // Helper untuk membersihkan path gambar
+    // Mengubah "signatures/filename.png" menjadi "filename.png"
+    // agar tidak terjadi duplikasi path saat digabung dengan api.defaults.baseURL
+    const getCleanSignatureUrl = (path) => {
+        if (!path) return null;
+        const filename = path.split('/').pop(); // Ambil nama file saja
+        return `${api.defaults.baseURL}/signatures/${filename}`;
+    };
+
     return (
         <div className="bg-gray-100 min-h-screen pb-10">
-            {/* Styles khusus print */}
             <style>{`
                 @media print {
                     .no-print { display: none !important; }
@@ -155,16 +159,16 @@ export default function BaHasilPenilaianPreviewPage() {
                     <p className="text-center mb-6 font-bold">Tim Penilai</p>
                     <div className="grid grid-cols-3 gap-4 text-center text-sm">
                         {signatures.map((sig, idx) => (
-                            <div key={idx} className="mb-4">
+                            <div key={idx} className="mb-4 page-break-inside-avoid">
                                 <p className="mb-4">{sig.jabatan}</p>
                                 <div className="h-20 flex items-center justify-center">
                                     {sig.signature_path && (
                                         <img 
-                                            src={`${api.defaults.baseURL}/signatures/${sig.signature_path}`} 
+                                            src={getCleanSignatureUrl(sig.signature_path)}
                                             alt="TTD" 
                                             className="h-full object-contain"
-                                            crossOrigin="anonymous" // PERBAIKAN UTAMA DI SINI
-                                            onError={handleImageError} // Tangani jika gambar error
+                                            crossOrigin="anonymous"
+                                            onError={handleImageError}
                                         />
                                     )}
                                 </div>
@@ -176,7 +180,7 @@ export default function BaHasilPenilaianPreviewPage() {
                 </div>
             </div>
 
-            {/* Tombol Aksi Bawah (No Print) - Redundant but good for UX */}
+            {/* Tombol Aksi Bawah (No Print) */}
             <div className="fixed bottom-0 w-full bg-white border-t p-4 flex justify-between items-center no-print shadow-lg max-w-[21cm] mx-auto left-0 right-0">
                 <Link to="/penilaian" className="text-blue-600 font-medium hover:underline">
                     &larr; Kembali ke Dashboard
