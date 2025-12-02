@@ -13,8 +13,9 @@ use App\Models\User;
 use App\Http\Controllers\Api\BeritaAcaraController;
 use App\Http\Controllers\Api\BaPemeriksaanController;
 use App\Http\Controllers\Api\FormulirAnalisisPenilaianController;
-// --- PENAMBAHAN BARU ---
 use App\Http\Controllers\Api\BaHasilPenilaianController;
+// --- PENAMBAHAN BARU ---
+use App\Http\Controllers\Api\NotificationController;
 // --- AKHIR PENAMBAHAN ---
 
 // Rute publik untuk login dan register
@@ -28,6 +29,10 @@ Route::get('/signatures/{filename}', [PenilaianController::class, 'getSignatureI
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // --- RUTE NOTIFIKASI BARU ---
+    Route::get('/notifications/count', [NotificationController::class, 'getCount']);
+    // ---------------------------
 
     Route::get('/users', function() {
         return User::whereIn('role', ['Koordinator Lapangan', 'Ketua Tim', 'Admin', 'Petugas Lapangan', 'Sekretariat'])->orderBy('nama')->get();
