@@ -1,47 +1,113 @@
 import { Outlet, useNavigate, Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api/axios';
 
 export default function Layout() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const location = useLocation(); // Untuk mentrigger refresh notifikasi saat pindah halaman
+    const location = useLocation();
+    
+    // State Notifikasi
     const [notifCount, setNotifCount] = useState(0);
+    const [notifications, setNotifications] = useState([]);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef(null);
 
     const handleLogout = async () => {
         await logout();
         navigate('/login');
     };
 
-    // Fungsi untuk mengambil jumlah notifikasi
-    const fetchNotifications = async () => {
+    // 1. Fetch Jumlah Notifikasi
+    const fetchNotificationCount = async () => {
         try {
             const response = await api.get('/notifications/count');
             setNotifCount(response.data.count);
         } catch (error) {
-            console.error("Gagal mengambil notifikasi:", error);
+            console.error("Gagal mengambil jumlah notifikasi:", error);
         }
     };
 
-    // Ambil notifikasi saat komponen di-mount dan setiap kali lokasi berubah (user navigasi)
-    // Ini memastikan badge update setelah user membuka halaman penilaian, misalnya.
+    // 2. Fetch Detail Notifikasi (Saat dropdown dibuka)
+    const fetchNotificationsList = async () => {
+        try {
+            const response = await api.get('/notifications');
+            setNotifications(response.data);
+        } catch (error) {
+            console.error("Gagal mengambil data notifikasi:", error);
+        }
+    };
+
+    // 3. Handler Klik Bell
+    const toggleDropdown = () => {
+        if (!isDropdownOpen) {
+            fetchNotificationsList(); // Load data saat dibuka
+        }
+        setIsDropdownOpen(!isDropdownOpen);
+    };
+
+    // 4. Handler Klik Item Notifikasi
+    const handleNotificationClick = async (notif) => {
+        try {
+            // A. Tandai sudah dibaca di backend
+            await api.post(`/notifications/${notif.id}/read`);
+            
+            // B. Update UI lokal
+            setNotifCount(prev => Math.max(0, prev - 1));
+            setNotifications(prev => prev.filter(n => n.id !== notif.id));
+            setIsDropdownOpen(false);
+
+            // C. Arahkan ke halaman detail
+            // Asumsi data notif menyimpan 'permohonan_id'
+            const permohonanId = notif.data.permohonan_id;
+            
+            // Logika navigasi cerdas:
+            // Cek apakah permohonan ini sudah punya Kasus ID (jika backend mengirimnya)
+            // Jika tidak, kita bisa arahkan ke halaman permohonan, atau dashboard penilaian.
+            // Di sini kita arahkan ke halaman edit permohonan sebagai default flow penilaian
+            // Atau jika Penilai, arahkan ke detail.
+            navigate(`/penilaian/${permohonanId}/edit`); 
+
+        } catch (error) {
+            console.error("Gagal memproses notifikasi:", error);
+        }
+    };
+
+    // 5. Handler Tandai Semua Dibaca
+    const handleMarkAllRead = async () => {
+        try {
+            await api.post('/notifications/read-all');
+            setNotifCount(0);
+            setNotifications([]);
+            setIsDropdownOpen(false);
+        } catch (error) {
+            console.error("Gagal menandai semua dibaca:", error);
+        }
+    };
+
+    // Tutup dropdown jika klik di luar
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [dropdownRef]);
+
+    // Initial load & Polling count
     useEffect(() => {
         if (user) {
-            fetchNotifications();
-            // Opsional: Polling setiap 30 detik agar notifikasi real-time
-            const interval = setInterval(fetchNotifications, 30000);
+            fetchNotificationCount();
+            const interval = setInterval(fetchNotificationCount, 30000); // Poll setiap 30s
             return () => clearInterval(interval);
         }
     }, [user, location.pathname]);
 
     const canManage = user && ['Admin', 'Sekretariat'].includes(user.role);
-
-    // Style untuk NavLink aktif
-    const activeLinkStyle = {
-        color: '#2563EB',
-        fontWeight: '600',
-    };
+    const activeLinkStyle = { color: '#2563EB', fontWeight: '600' };
 
     return (
         <div className="min-h-screen bg-gray-100 font-sans">
@@ -65,25 +131,81 @@ export default function Layout() {
 
                         {/* Info User, Notifikasi dan Logout */}
                         <div className="flex items-center gap-4">
-                            {/* --- FITUR NOTIFIKASI --- */}
-                            <Link 
-                                to="/penilaian" 
-                                className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-full hover:bg-gray-100 focus:outline-none"
-                                title="Lihat Daftar Tugas / Penilaian"
-                            >
-                                {/* Ikon Lonceng (SVG) */}
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                                </svg>
-                                
-                                {/* Badge Notifikasi */}
-                                {notifCount > 0 && (
-                                    <span className="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full min-w-[18px] h-[18px] border-2 border-white shadow-sm animate-pulse">
-                                        {notifCount > 99 ? '99+' : notifCount}
-                                    </span>
+                            
+                            {/* --- KOMPONEN NOTIFIKASI DROPDOWN --- */}
+                            <div className="relative" ref={dropdownRef}>
+                                <button 
+                                    onClick={toggleDropdown}
+                                    className="relative p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-full hover:bg-gray-100 focus:outline-none"
+                                    title="Notifikasi"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                    </svg>
+                                    
+                                    {notifCount > 0 && (
+                                        <span className="absolute top-1 right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full min-w-[18px] h-[18px] border-2 border-white shadow-sm animate-pulse">
+                                            {notifCount > 99 ? '99+' : notifCount}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {isDropdownOpen && (
+                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl overflow-hidden z-50 border border-gray-100 animate-fade-in-down">
+                                        <div className="px-4 py-3 bg-gray-50 border-b flex justify-between items-center">
+                                            <h3 className="text-sm font-semibold text-gray-700">Notifikasi</h3>
+                                            {notifications.length > 0 && (
+                                                <button onClick={handleMarkAllRead} className="text-xs text-blue-600 hover:underline">
+                                                    Tandai semua dibaca
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="max-h-80 overflow-y-auto">
+                                            {notifications.length === 0 ? (
+                                                <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                                                    Tidak ada notifikasi baru.
+                                                </div>
+                                            ) : (
+                                                <ul className="divide-y divide-gray-100">
+                                                    {notifications.map((notif) => (
+                                                        <li key={notif.id}>
+                                                            <button 
+                                                                onClick={() => handleNotificationClick(notif)}
+                                                                className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors duration-150 group"
+                                                            >
+                                                                <div className="flex justify-between items-start">
+                                                                    <p className="text-sm font-medium text-gray-800 group-hover:text-blue-700">
+                                                                        Permohonan Baru
+                                                                    </p>
+                                                                    <span className="text-xs text-gray-400">
+                                                                        {new Date(notif.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                                                    {notif.data.message || `Permohonan #${notif.data.nomor_permohonan} dari ${notif.data.nama_pelaku_usaha}`}
+                                                                </p>
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="px-4 py-2 bg-gray-50 border-t text-center">
+                                            <Link 
+                                                to="/penilaian" 
+                                                onClick={() => setIsDropdownOpen(false)}
+                                                className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                                            >
+                                                Lihat Semua Permohonan &rarr;
+                                            </Link>
+                                        </div>
+                                    </div>
                                 )}
-                            </Link>
-                            {/* --- AKHIR FITUR NOTIFIKASI --- */}
+                            </div>
+                            {/* --- AKHIR NOTIFIKASI DROPDOWN --- */}
 
                             <div className="hidden sm:block text-right">
                                 <span className="block text-gray-800 text-sm font-semibold">{user ? user.nama : 'Guest'}</span>
