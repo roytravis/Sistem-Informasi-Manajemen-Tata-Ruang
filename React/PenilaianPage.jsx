@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios.js';
 
 // Komponen Badge Status
@@ -27,16 +27,31 @@ export default function PenilaianPage() {
     const [error, setError] = useState('');
     const [isNavigating, setIsNavigating] = useState(null);
     const navigate = useNavigate();
+    
+    // Gunakan useSearchParams untuk membaca query string URL (e.g. ?id=123)
+    const [searchParams, setSearchParams] = useSearchParams();
+    const highlightedId = searchParams.get('id');
 
     const [filter, setFilter] = useState('pending');
     const [pagination, setPagination] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
 
-    const fetchPmpUmk = async (page = 1, statusFilter = 'pending') => {
+    const fetchPmpUmk = async (page = 1, statusFilter = 'pending', filterId = null) => {
         setError('');
         setLoading(true);
         try {
-            const response = await api.get(`/permohonan-penilaian?page=${page}&status=${statusFilter}`);
+            // Bangun URL Query
+            let url = `/permohonan-penilaian?page=${page}`;
+            
+            // Jika ada filter ID (dari notifikasi), prioritas utama
+            if (filterId) {
+                url += `&id=${filterId}`;
+            } else {
+                // Jika tidak ada ID, gunakan filter status biasa
+                url += `&status=${statusFilter}`;
+            }
+
+            const response = await api.get(url);
             setPmpList(response.data.data);
             setPagination({
                 current_page: response.data.current_page,
@@ -54,12 +69,20 @@ export default function PenilaianPage() {
     };
 
     useEffect(() => {
-        fetchPmpUmk(currentPage, filter);
-    }, [currentPage, filter]);
+        // Fetch data saat parameter berubah
+        fetchPmpUmk(currentPage, filter, highlightedId);
+    }, [currentPage, filter, highlightedId]);
     
     const handleFilterChange = (newFilter) => {
         setFilter(newFilter);
         setCurrentPage(1);
+        // Hapus parameter ID jika user mengganti tab manual
+        setSearchParams({});
+    };
+
+    const handleClearHighlight = () => {
+        setSearchParams({}); // Hapus query param ?id=...
+        fetchPmpUmk(1, filter, null); // Refresh data normal
     };
 
     const handleNilai = async (permohonan) => {
@@ -88,7 +111,8 @@ export default function PenilaianPage() {
         if (window.confirm('Apakah Anda yakin ingin menghapus data permohonan ini?')) {
             try {
                 await api.delete(`/permohonan-penilaian/${permohonanId}`);
-                fetchPmpUmk(currentPage, filter);
+                // Refresh data
+                fetchPmpUmk(currentPage, filter, highlightedId);
             } catch (err) {
                 setError('Gagal menghapus data. Silakan coba lagi.');
             }
@@ -111,16 +135,32 @@ export default function PenilaianPage() {
                     </button>
                 </div>
 
-                <div className="border-b border-gray-200 mb-4">
-                    <nav className="-mb-px flex space-x-6">
-                        <button onClick={() => handleFilterChange('pending')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'pending' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                            Menunggu Penilaian
+                {/* Tab Filter / Info Highlight */}
+                {highlightedId ? (
+                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md flex justify-between items-center">
+                        <div>
+                            <span className="font-semibold text-blue-800">Mode Filter Notifikasi:</span>
+                            <span className="text-blue-600 ml-2">Menampilkan data spesifik.</span>
+                        </div>
+                        <button 
+                            onClick={handleClearHighlight}
+                            className="text-sm bg-white border border-blue-300 text-blue-700 px-3 py-1 rounded hover:bg-blue-100"
+                        >
+                            &larr; Tampilkan Semua Data
                         </button>
-                        <button onClick={() => handleFilterChange('all')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'all' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                            Semua Permohonan
-                        </button>
-                    </nav>
-                </div>
+                    </div>
+                ) : (
+                    <div className="border-b border-gray-200 mb-4">
+                        <nav className="-mb-px flex space-x-6">
+                            <button onClick={() => handleFilterChange('pending')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'pending' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                                Menunggu Penilaian
+                            </button>
+                            <button onClick={() => handleFilterChange('all')} className={`py-3 px-1 border-b-2 font-medium text-sm ${filter === 'all' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                                Semua Permohonan
+                            </button>
+                        </nav>
+                    </div>
+                )}
                 
                 {loading && <p className="text-center py-4">Memuat data...</p>}
                 {error && <p className="text-red-500 p-3 bg-red-100 rounded-md">{error}</p>}
@@ -145,15 +185,13 @@ export default function PenilaianPage() {
                                         
                                         const isSelesaiDinilai = sudahDinilai && (p.kasus.status.toLowerCase().includes('selesai') || p.kasus.status === 'Menunggu Verifikasi');
                                         const baPemeriksaanDibuat = p.kasus?.penilaian?.ba_pemeriksaan;
-                                        const formulirAnalisisDibuat = p.kasus?.penilaian?.formulir_analisis; // Pastikan ini diload dari backend
+                                        const formulirAnalisisDibuat = p.kasus?.penilaian?.formulir_analisis;
                                         
                                         const showAnalisisButton = isSelesaiDinilai && baPemeriksaanDibuat;
-                                        // --- LOGIKA TOMBOL BARU ---
-                                        // Tombol BA Hasil muncul jika Formulir Analisis sudah ada
                                         const showBaHasilButton = isSelesaiDinilai && formulirAnalisisDibuat; 
 
                                         return (
-                                        <tr key={p.id} className="hover:bg-gray-50">
+                                        <tr key={p.id} className={`hover:bg-gray-50 ${highlightedId == p.id ? 'bg-blue-50 ring-2 ring-inset ring-blue-200' : ''}`}>
                                             <td className="py-3 px-4">{p.pemegang?.nama_pelaku_usaha || '-'}</td>
                                             <td className="py-3 px-4 font-mono">{p.pemegang?.nomor_identitas || '-'}</td>
                                             <td className="py-3 px-4"><StatusPenilaianBadge permohonan={p} /></td>
@@ -191,7 +229,7 @@ export default function PenilaianPage() {
                                                         </button>
                                                     )}
 
-                                                    {/* --- TOMBOL BARU: Berita Acara Hasil Penilaian --- */}
+                                                    {/* Berita Acara Hasil Penilaian */}
                                                     {showBaHasilButton && (
                                                         <button
                                                             onClick={() => navigate(`/penilaian/${p.kasus.penilaian.id}/ba-hasil`)}
@@ -219,7 +257,6 @@ export default function PenilaianPage() {
                                 </tbody>
                             </table>
                         </div>
-                        {/* Pagination Controls omitted for brevity, keep existing */}
                     </>
                 )}
             </div>

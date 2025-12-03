@@ -58,16 +58,18 @@ export default function Layout() {
             setNotifications(prev => prev.filter(n => n.id !== notif.id));
             setIsDropdownOpen(false);
 
-            // C. Arahkan ke halaman detail
+            // C. Arahkan ke halaman tujuan dengan KONTEKS
             // Asumsi data notif menyimpan 'permohonan_id'
             const permohonanId = notif.data.permohonan_id;
             
-            // Logika navigasi cerdas:
-            // Cek apakah permohonan ini sudah punya Kasus ID (jika backend mengirimnya)
-            // Jika tidak, kita bisa arahkan ke halaman permohonan, atau dashboard penilaian.
-            // Di sini kita arahkan ke halaman edit permohonan sebagai default flow penilaian
-            // Atau jika Penilai, arahkan ke detail.
-            navigate(`/penilaian/${permohonanId}/edit`); 
+            if (permohonanId) {
+                // LOGIKA BARU: Arahkan ke Dashboard Penilaian dengan filter ID
+                // Ini akan memicu PenilaianPage untuk hanya menampilkan item ini.
+                navigate(`/penilaian?id=${permohonanId}`);
+            } else {
+                // Fallback jika tidak ada ID
+                navigate('/penilaian');
+            }
 
         } catch (error) {
             console.error("Gagal memproses notifikasi:", error);
