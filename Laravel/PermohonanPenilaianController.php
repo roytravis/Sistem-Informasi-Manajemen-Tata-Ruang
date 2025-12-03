@@ -24,8 +24,15 @@ class PermohonanPenilaianController extends Controller
             'beritaAcara'
         ]);
 
-        if ($request->query('status') === 'pending') {
-            $query->whereIn('status', ['Baru', 'Menunggu Penilaian', 'Draft']);
+        // LOGIKA BARU: Filter berdasarkan ID spesifik (dari Notifikasi)
+        // Jika ada parameter 'id', kita cari spesifik dan abaikan filter status 'pending'
+        if ($request->has('id')) {
+            $query->where('id', $request->query('id'));
+        } else {
+            // Jika tidak ada ID, baru kita terapkan filter status standar
+            if ($request->query('status') === 'pending') {
+                $query->whereIn('status', ['Baru', 'Menunggu Penilaian', 'Draft']);
+            }
         }
 
         $penilaians = $query->latest()->paginate(15);
