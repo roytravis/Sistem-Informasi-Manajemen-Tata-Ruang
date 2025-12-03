@@ -3,40 +3,61 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\PermohonanPenilaian;
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
 {
     /**
-     * Mengambil jumlah notifikasi tugas baru untuk user yang sedang login.
-     * Tugas dianggap baru jika statusnya 'Menunggu Penilaian', 'Baru', atau 'Proses Survei'
-     * dan ditugaskan ke tim user atau user itu sendiri.
+     * Mengambil daftar notifikasi user yang belum dibaca.
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        
+        // Ambil notifikasi database (unread)
+        $notifications = $user->unreadNotifications()
+                              ->latest()
+                              ->take(10) // Ambil 10 terbaru
+                              ->get();
+
+        return response()->json($notifications);
+    }
+
+    /**
+     * Menghitung jumlah notifikasi yang belum dibaca.
      */
     public function getCount(Request $request)
     {
         $user = $request->user();
+        $count = $user->unreadNotifications()->count();
+
+        return response()->json(['count' => $count]);
+    }
+
+    /**
+     * Menandai notifikasi spesifik sebagai sudah dibaca.
+     */
+    public function markAsRead(Request $request, $id)
+    {
+        $user = $request->user();
         
-        // 1. Ambil semua ID Tim dimana user ini menjadi anggota
-        // Relasi 'tims' sudah didefinisikan di model User (belongsToMany)
-        $teamIds = $user->tims()->pluck('tims.id');
+        $notification = $user->notifications()->where('id', $id)->first();
 
-        // 2. Query Permohonan Penilaian
-        $count = PermohonanPenilaian::query()
-            ->where(function($query) use ($teamIds, $user) {
-                // Logika: User mendapat notifikasi jika:
-                // a. Tugas diberikan kepada Tim-nya
-                $query->whereIn('tim_id', $teamIds)
-                // b. ATAU Tugas diberikan langsung kepadanya sebagai Koordinator (Penanggung Jawab)
-                      ->orWhere('penanggung_jawab_id', $user->id);
-            })
-            // Filter Status Tugas yang dianggap "Perlu Perhatian" / "Baru"
-            ->whereIn('status', ['Menunggu Penilaian', 'Baru', 'Proses Survei'])
-            ->count();
+        if ($notification) {
+            $notification->markAsRead();
+        }
 
-        return response()->json([
-            'count' => $count,
-            'message' => 'Notification count retrieved successfully'
-        ]);
+        return response()->json(['message' => 'Notification marked as read']);
+    }
+
+    /**
+     * Menandai semua notifikasi sebagai sudah dibaca.
+     */
+    public function markAllRead(Request $request)
+    {
+        $user = $request->user();
+        $user->unreadNotifications->markAsRead();
+
+        return response()->json(['message' => 'All notifications marked as read']);
     }
 }

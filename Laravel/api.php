@@ -14,9 +14,7 @@ use App\Http\Controllers\Api\BeritaAcaraController;
 use App\Http\Controllers\Api\BaPemeriksaanController;
 use App\Http\Controllers\Api\FormulirAnalisisPenilaianController;
 use App\Http\Controllers\Api\BaHasilPenilaianController;
-// --- PENAMBAHAN BARU ---
 use App\Http\Controllers\Api\NotificationController;
-// --- AKHIR PENAMBAHAN ---
 
 // Rute publik untuk login dan register
 Route::post('/register', [AuthController::class, 'register']);
@@ -30,8 +28,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // --- RUTE NOTIFIKASI BARU ---
-    Route::get('/notifications/count', [NotificationController::class, 'getCount']);
+    // --- RUTE NOTIFIKASI ---
+    Route::get('/notifications', [NotificationController::class, 'index']); // List notifikasi
+    Route::get('/notifications/count', [NotificationController::class, 'getCount']); // Jumlah
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']); // Tandai satu baca
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']); // Tandai semua
     // ---------------------------
 
     Route::get('/users', function() {
@@ -107,7 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/formulir-analisis/{penilaian}', [FormulirAnalisisPenilaianController::class, 'store'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
          
-    // --- RUTE BERITA ACARA HASIL PENILAIAN (BARU) ---
+    // --- RUTE BERITA ACARA HASIL PENILAIAN ---
     Route::get('/ba-hasil-penilaian/{penilaianId}', [BaHasilPenilaianController::class, 'show'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim,Petugas Lapangan');
     Route::post('/ba-hasil-penilaian', [BaHasilPenilaianController::class, 'store'])

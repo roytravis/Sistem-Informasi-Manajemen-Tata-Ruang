@@ -4,28 +4,29 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PermohonanPenilaian;
+use App\Models\Tim;
+use App\Models\User;
+use App\Notifications\AssessmentAssigned; // Import Notification
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Notification;
 
 class PermohonanPenilaianController extends Controller
 {
     public function index(Request $request)
     {
-        // PERBAIKAN: Eager load relasi 'baPemeriksaan' dan 'formulirAnalisis'
+        // Eager load relasi
         $query = PermohonanPenilaian::with([
             'pemegang', 
-            'kasus.penilaian.baPemeriksaan', // Memuat BA Pemeriksaan
-            'kasus.penilaian.formulirAnalisis', // Memuat Formulir Analisis (jika ada)
-            'beritaAcara' // BA Tidak Terlaksana
+            'kasus.penilaian.baPemeriksaan',
+            'kasus.penilaian.formulirAnalisis',
+            'beritaAcara'
         ]);
 
-        // --- PERUBAHAN LOGIKA FILTER 'PENDING' ---
         if ($request->query('status') === 'pending') {
-            // Tampilkan yang statusnya 'Baru', 'Menunggu Penilaian', atau 'Draft'
             $query->whereIn('status', ['Baru', 'Menunggu Penilaian', 'Draft']);
         }
-        // --- AKHIR PERUBAHAN ---
 
         $penilaians = $query->latest()->paginate(15);
         
@@ -41,13 +42,40 @@ class PermohonanPenilaianController extends Controller
         ]);
 
         $validatedData['nomor_permohonan'] = now()->timestamp . '-' . Str::random(5);
-        
-        // Status default saat dibuat manual adalah 'Menunggu Penilaian'
         $validatedData['status'] = 'Menunggu Penilaian';
 
-
         $penilaian = PermohonanPenilaian::create($validatedData);
-        return response()->json($penilaian->load('pemegang'), 201);
+        $penilaian->load('pemegang'); // Load pemegang untuk data notifikasi
+
+        // --- KIRIM NOTIFIKASI ---
+        $usersToNotify = collect();
+
+        // 1. Jika ditugaskan ke Tim, notifikasi semua anggota tim
+        if (!empty($validatedData['tim_id'])) {
+            $tim = Tim::with('users')->find($validatedData['tim_id']);
+            if ($tim) {
+                $usersToNotify = $usersToNotify->merge($tim->users);
+            }
+        }
+
+        // 2. Jika ditugaskan ke Koordinator (Penanggung Jawab), notifikasi dia
+        if (!empty($validatedData['penanggung_jawab_id'])) {
+            $koordinator = User::find($validatedData['penanggung_jawab_id']);
+            if ($koordinator) {
+                // Hindari duplikasi jika koordinator juga anggota tim
+                if (!$usersToNotify->contains('id', $koordinator->id)) {
+                    $usersToNotify->push($koordinator);
+                }
+            }
+        }
+
+        // Kirim notifikasi menggunakan Facade
+        if ($usersToNotify->isNotEmpty()) {
+            Notification::send($usersToNotify, new AssessmentAssigned($penilaian));
+        }
+        // --- AKHIR KIRIM NOTIFIKASI ---
+
+        return response()->json($penilaian, 201);
     }
 
     public function show(PermohonanPenilaian $permohonanPenilaian)
@@ -69,7 +97,6 @@ class PermohonanPenilaianController extends Controller
 
     public function destroy(PermohonanPenilaian $permohonanPenilaian)
     {
-        // Hapus juga BA terkait jika ada, untuk menghindari data yatim
         if ($permohonanPenilaian->beritaAcara) {
             $permohonanPenilaian->beritaAcara->delete();
         }
