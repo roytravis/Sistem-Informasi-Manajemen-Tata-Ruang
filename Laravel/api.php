@@ -71,10 +71,12 @@ Route::middleware('auth:sanctum')->group(function () {
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim');
     Route::get('/permohonan-penilaian/{permohonanPenilaian}', [PermohonanPenilaianController::class, 'show'])
          ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim');
+    
+    // PERBAIKAN: Batasi Update dan Delete hanya untuk Admin dan Ketua Tim
     Route::put('/permohonan-penilaian/{permohonanPenilaian}', [PermohonanPenilaianController::class, 'update'])
-         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim');
+         ->middleware('role:Admin,Ketua Tim');
     Route::delete('/permohonan-penilaian/{permohonanPenilaian}', [PermohonanPenilaianController::class, 'destroy'])
-         ->middleware('role:Admin,Koordinator Lapangan,Ketua Tim');
+         ->middleware('role:Admin,Ketua Tim');
 
 
     // --- BLOK RUTE PROSES PENILAIAN ---
