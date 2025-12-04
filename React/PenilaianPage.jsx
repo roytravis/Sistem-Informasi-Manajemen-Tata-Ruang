@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios.js';
+import { useAuth } from '../context/AuthContext'; // Import AuthContext
 
 // Komponen Badge Status
 const StatusPenilaianBadge = ({ permohonan }) => {
@@ -22,6 +23,7 @@ const StatusPenilaianBadge = ({ permohonan }) => {
 };
 
 export default function PenilaianPage() {
+    const { user } = useAuth(); // Ambil data user yang sedang login
     const [pmpList, setPmpList] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -35,6 +37,9 @@ export default function PenilaianPage() {
     const [filter, setFilter] = useState('pending');
     const [pagination, setPagination] = useState(null);
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Cek Hak Akses Edit/Delete (Hanya Admin dan Ketua Tim)
+    const canEditDelete = user && ['Admin', 'Ketua Tim'].includes(user.role);
 
     const fetchPmpUmk = async (page = 1, statusFilter = 'pending', filterId = null) => {
         setError('');
@@ -114,7 +119,7 @@ export default function PenilaianPage() {
                 // Refresh data
                 fetchPmpUmk(currentPage, filter, highlightedId);
             } catch (err) {
-                setError('Gagal menghapus data. Silakan coba lagi.');
+                setError(err.response?.data?.message || 'Gagal menghapus data. Silakan coba lagi.');
             }
         }
     };
@@ -240,11 +245,13 @@ export default function PenilaianPage() {
                                                         </button>
                                                     )}
                                                     
-                                                    {/* Tombol Edit & Hapus */}
-                                                    {!tidakTerlaksana && (
+                                                    {/* Tombol Edit & Hapus (Hanya Admin & Ketua Tim) */}
+                                                    {!tidakTerlaksana && canEditDelete && (
                                                         <button onClick={() => handleEdit(p.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Edit</button>
                                                     )}
-                                                    <button onClick={() => handleDelete(p.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Hapus</button>
+                                                    {canEditDelete && (
+                                                        <button onClick={() => handleDelete(p.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Hapus</button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
