@@ -243,6 +243,39 @@ const sanitizeNumericValue = (value) => {
     return finalValue;
 };
 
+// --- KOMPONEN MODAL EDIT REQUEST (BARU) ---
+const ModalRequestEdit = ({ isOpen, onClose, onSubmit, loading }) => {
+    const [alasan, setAlasan] = useState('');
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 no-print">
+            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+                <h3 className="text-lg font-bold mb-4">Permohonan Edit Data</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                    Formulir ini terkunci. Jelaskan alasan Anda ingin mengubah data ini untuk meminta persetujuan Ketua Tim.
+                </p>
+                <textarea
+                    className="w-full border p-2 rounded mb-4 text-sm"
+                    rows="4"
+                    placeholder="Contoh: Ada kesalahan input pada luas tanah..."
+                    value={alasan}
+                    onChange={(e) => setAlasan(e.target.value)}
+                ></textarea>
+                <div className="flex justify-end gap-2">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300">Batal</button>
+                    <button 
+                        onClick={() => onSubmit(alasan)} 
+                        disabled={!alasan.trim() || loading}
+                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-blue-300"
+                    >
+                        {loading ? 'Mengirim...' : 'Kirim Permohonan'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- Komponen Utama Halaman ---
 
@@ -251,19 +284,26 @@ export default function FormulirAnalisisPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     
+    // State Data Utama
     const [kasus, setKasus] = useState(null);
     const [penilaian, setPenilaian] = useState(null);
     const [loading, setLoading] = useState(true);
     const [submitLoading, setSubmitLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // State untuk Mode Read-Only (Preview) vs Edit
+    // State Mode & Logika Tampilan
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [dataExists, setDataExists] = useState(false);
-    const [initialData, setInitialData] = useState(null); // Untuk fitur Batal
+    const [initialData, setInitialData] = useState(null); 
+
+    // State untuk Fitur Request Edit
+    const [editRequest, setEditRequest] = useState(null);
+    const [showRequestModal, setShowRequestModal] = useState(false);
+    const [requestLoading, setRequestLoading] = useState(false);
 
     const signatureRefs = useRef({});
 
+    // State Form
     const [formData, setFormData] = useState({
         lokasi_kesesuaian_pmp_eksisting: 'Sesuai',
         jenis_kesesuaian_pmp_eksisting: 'Sesuai',
@@ -304,15 +344,26 @@ export default function FormulirAnalisisPage() {
             setLoading(true);
             setError('');
             try {
+                // 1. Ambil Data Kasus & Penilaian
                 const kasusRes = await api.get(`/penilaian/pmp-umk/${kasusId}`);
                 if (!kasusRes.data || !kasusRes.data.penilaian) {
                     throw new Error('Data penilaian tidak ditemukan untuk kasus ini.');
                 }
                 setKasus(kasusRes.data);
-                setPenilaian(kasusRes.data.penilaian);
+                const penilaianData = kasusRes.data.penilaian;
+                setPenilaian(penilaianData);
 
+                // 2. Ambil Status Edit Request (Logika Baru)
                 try {
-                    const analisisRes = await api.get(`/formulir-analisis/${kasusRes.data.penilaian.id}`);
+                    const requestRes = await api.get(`/edit-requests/status/${penilaianData.id}`);
+                    setEditRequest(requestRes.data);
+                } catch (reqErr) {
+                    console.log("Belum ada request edit", reqErr);
+                }
+
+                // 3. Ambil Data Formulir Analisis
+                try {
+                    const analisisRes = await api.get(`/formulir-analisis/${penilaianData.id}`);
                     if (analisisRes.data) {
                         const apiData = {
                             ...analisisRes.data,
@@ -344,17 +395,31 @@ export default function FormulirAnalisisPage() {
                         };
 
                         setFormData(prev => ({ ...prev, ...apiData }));
-                        // Simpan data awal untuk fitur Batal
                         setInitialData({ ...formData, ...apiData });
-                        // Set status data exists dan read-only
                         setDataExists(true);
-                        setIsReadOnly(true); 
+
+                        // --- LOGIKA KUNCI READ ONLY ---
+                        // Cek status edit request terbaru dari endpoint
+                        // (Karena `editRequest` di state mungkin belum terupdate saat baris ini jalan,
+                        // kita fetch ulang atau gunakan promise all di atas. Tapi di sini kita gunakan logika terpisah)
+                        // Untuk aman, kita fetch status lagi di dalam blok ini atau gunakan chain.
+                        // Namun untuk simplifikasi, kita asumsikan isReadOnly true dulu, lalu update jika approved.
+                        
+                        setIsReadOnly(true); // Default terkunci jika data ada
                     }
                 } catch (analisisErr) {
                     if (analisisErr.response?.status !== 404) {
                         throw analisisErr;
                     }
                     // Jika 404, biarkan isReadOnly false (mode input baru)
+                    setIsReadOnly(false);
+                }
+
+                // Update isReadOnly berdasarkan status request yang didapat di langkah 2
+                // Kita ambil lagi nilai response request jika perlu, atau gunakan state setter
+                const requestRes = await api.get(`/edit-requests/status/${penilaianData.id}`);
+                if (requestRes.data?.status === 'approved') {
+                    setIsReadOnly(false); // Buka kunci jika approved
                 }
 
             } catch (err) {
@@ -454,18 +519,90 @@ export default function FormulirAnalisisPage() {
         return kasus.tim.users;
     }, [kasus]);
     
-    // --- Handler Aksi ---
-
-    const handleEditClick = () => {
-        setIsReadOnly(false);
+    // --- Handler Aksi Edit Request (BARU) ---
+    const handleRequestEditSubmit = async (alasan) => {
+        setRequestLoading(true);
+        try {
+            const res = await api.post('/edit-requests', {
+                penilaian_id: penilaian.id,
+                alasan: alasan
+            });
+            setEditRequest(res.data);
+            alert('Permohonan edit berhasil dikirim ke Ketua Tim.');
+            setShowRequestModal(false);
+        } catch (err) {
+            alert(err.response?.data?.message || 'Gagal mengirim permohonan.');
+        } finally {
+            setRequestLoading(false);
+        }
     };
+
+    // --- Helper Render Tombol Edit (BARU) ---
+    const renderEditAction = () => {
+        // Jika form belum pernah disimpan, tidak perlu tombol edit request
+        if (!dataExists) return null;
+
+        // Cek status request
+        const status = editRequest?.status;
+
+        if (status === 'pending') {
+            return (
+                <button disabled className="bg-gray-400 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md cursor-not-allowed">
+                    Menunggu Persetujuan
+                </button>
+            );
+        }
+
+        if (status === 'approved') {
+            // Sedang dalam mode edit (isReadOnly harusnya false)
+            return (
+                <span className="text-green-600 font-bold text-sm px-4 py-2 border border-green-600 rounded bg-green-50">
+                    Mode Edit Disetujui
+                </span>
+            );
+        }
+        
+        if (status === 'rejected') {
+             return (
+                <div className="flex items-center gap-2">
+                    <span className="text-red-600 font-bold text-sm">Permohonan Ditolak</span>
+                    <button 
+                        onClick={() => setShowRequestModal(true)} 
+                        className="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded border border-yellow-300"
+                    >
+                        Ajukan Lagi
+                    </button>
+                </div>
+            );
+        }
+
+        // Default: Form terkunci, tombol "Ajukan Edit"
+        if (isReadOnly) {
+            return (
+                <button 
+                    onClick={() => setShowRequestModal(true)} 
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
+                >
+                    Ajukan Edit
+                </button>
+            );
+        }
+
+        return null;
+    };
+
+    // --- Handler Aksi Lainnya ---
 
     const handleCancelClick = () => {
         // Kembalikan data ke posisi awal (saved state)
         if (initialData) {
             setFormData(initialData);
         }
-        setIsReadOnly(true);
+        // Note: Untuk alur edit request, kita mungkin tidak ingin langsung mengunci kembali isReadOnly
+        // kecuali user ingin 'membatalkan sesi edit' sepenuhnya. 
+        // Tapi jika status 'approved', user harus bisa edit kapan saja sampai disimpan kembali.
+        // Di sini kita biarkan user tetap di mode edit (jika approved), hanya reset data.
+        // Jika bukan approved (misal input baru), baru kita kunci/navigasi.
     };
 
     const handlePrintClick = () => {
@@ -524,7 +661,8 @@ export default function FormulirAnalisisPage() {
             // Update initial data dengan data baru dan set ke read-only
             setInitialData(formData); 
             setDataExists(true);
-            setIsReadOnly(true);
+            setIsReadOnly(true); // Kembali ReadOnly setelah simpan (Backend akan ubah status request jadi completed)
+            setEditRequest(prev => ({ ...prev, status: 'completed' })); // Update status lokal agar UI sync
             
             // Scroll ke atas
             window.scrollTo(0, 0);
@@ -564,39 +702,53 @@ export default function FormulirAnalisisPage() {
         <div className="bg-gray-100">
             <PrintStyles />
 
+            {/* Modal Request Edit */}
+            <ModalRequestEdit 
+                isOpen={showRequestModal} 
+                onClose={() => setShowRequestModal(false)}
+                onSubmit={handleRequestEditSubmit}
+                loading={requestLoading}
+            />
+
             {/* Tombol Aksi Atas */}
             <div className="mb-6 flex justify-between items-center no-print px-4 py-3 bg-white shadow-sm sm:px-6 lg:px-8 action-bar">
                 <Link to="/penilaian" className="text-blue-600 hover:underline">&larr; Kembali ke Dashboard Penilaian</Link>
-                <div className="flex space-x-3">
+                <div className="flex space-x-3 items-center">
                     {/* Jika Data Ada (Mode Baca/Preview) */}
-                    {isReadOnly && dataExists && (
-                        <>
-                            <button 
-                                onClick={handlePrintClick} 
-                                className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
-                            >
-                                Print PDF
-                            </button>
-                            <button 
-                                onClick={handleEditClick} 
-                                className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
-                            >
-                                Edit Data
-                            </button>
-                        </>
+                    {dataExists && (
+                        <button 
+                            onClick={handlePrintClick} 
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
+                        >
+                            Print PDF
+                        </button>
                     )}
+
+                    {/* Tombol Edit Dinamis (Ajukan Edit / Status / Mode Edit) */}
+                    {renderEditAction()}
                     
                     {/* Jika Mode Edit Aktif (dan data sudah ada sebelumnya) */}
-                    {!isReadOnly && dataExists && (
+                    {!isReadOnly && dataExists && editRequest?.status === 'approved' && (
                         <button 
                             onClick={handleCancelClick} 
                             className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-md"
                         >
-                            Batal Edit
+                            Reset Input
                         </button>
                     )}
                 </div>
             </div>
+
+            {/* Banner Status Penolakan */}
+            {editRequest?.status === 'rejected' && (
+                <div className="max-w-6xl mx-auto mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-4 no-print rounded shadow-sm">
+                    <p className="font-bold flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/></svg>
+                        Permohonan Edit Ditolak
+                    </p>
+                    <p className="mt-1 ml-7 text-sm">Alasan: "{editRequest.alasan_penolakan}"</p>
+                </div>
+            )}
 
             {/* Area Form */}
             <div className="printable-area max-w-6xl mx-auto bg-white rounded-lg shadow-lg mb-8">
@@ -1111,13 +1263,16 @@ export default function FormulirAnalisisPage() {
                     {/* Tombol Aksi Bawah - Hanya muncul saat mode EDIT/INPUT */}
                     {!isReadOnly && (
                         <div className="flex justify-end pt-4 print:hidden no-print space-x-3">
-                            {dataExists && (
+                            {/* Tombol Batal Edit jika sudah disetujui (opsional, untuk clear form ke state awal) */}
+                            {dataExists && editRequest?.status === 'approved' && (
                                 <button 
                                     type="button"
-                                    onClick={handleCancelClick}
+                                    onClick={() => {
+                                        if (initialData) setFormData(initialData);
+                                    }}
                                     className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg shadow-md"
                                 >
-                                    Batal
+                                    Reset
                                 </button>
                             )}
                             <button 

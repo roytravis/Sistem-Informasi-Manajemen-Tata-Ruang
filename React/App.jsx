@@ -23,6 +23,7 @@ import FormulirAnalisisPage from './pages/FormulirAnalisisPage';
 // --- IMPORT HALAMAN BARU ---
 import BaHasilPenilaianInputPage from './pages/BaHasilPenilaianInputPage';
 import BaHasilPenilaianPreviewPage from './pages/BaHasilPenilaianPreviewPage';
+import EditApprovalPage from './pages/EditApprovalPage'; // <-- Import Halaman Persetujuan Edit
 
 function App() {
   return (
@@ -47,6 +48,9 @@ function App() {
           <Route path="penilaian/:id/edit" element={<EditPenilaianPage />} />
           <Route path="penilaian/:id" element={<PenilaianDetailPage />} />
           
+          {/* Rute Baru untuk Persetujuan Edit */}
+          <Route path="penilaian/persetujuan-edit" element={<EditApprovalPage />} />
+
           <Route path="penilaian/berita-acara/tambah" element={<AddBeritaAcaraPage />} />
           <Route path="penilaian/berita-acara/:id/preview" element={<BeritaAcaraPreviewPage />} />
           <Route path="penilaian/:id/berita-acara-pemeriksaan" element={<BeritaAcaraPemeriksaanPage />} />
