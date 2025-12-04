@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\BaPemeriksaanController;
 use App\Http\Controllers\Api\FormulirAnalisisPenilaianController;
 use App\Http\Controllers\Api\BaHasilPenilaianController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\EditRequestController; // <-- IMPORT BARU
 
 // Rute publik untuk login dan register
 Route::post('/register', [AuthController::class, 'register']);
@@ -33,6 +34,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/count', [NotificationController::class, 'getCount']); // Jumlah
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']); // Tandai satu baca
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']); // Tandai semua
+    // ---------------------------
+
+    // --- RUTE EDIT REQUEST (BARU) ---
+    Route::post('/edit-requests', [EditRequestController::class, 'requestEdit']); // User ajukan edit
+    Route::get('/edit-requests/pending', [EditRequestController::class, 'getPendingRequests']); // Ketua Tim lihat list
+    Route::post('/edit-requests/{id}/process', [EditRequestController::class, 'processRequest']); // Ketua Tim setujui/tolak
+    Route::get('/edit-requests/status/{penilaianId}', [EditRequestController::class, 'checkStatus']); // Cek status di FE
     // ---------------------------
 
     Route::get('/users', function() {

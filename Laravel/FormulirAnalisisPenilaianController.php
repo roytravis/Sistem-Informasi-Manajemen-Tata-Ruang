@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FormulirAnalisisPenilaian;
 use App\Models\Penilaian;
+use App\Models\EditRequest; // <-- DITAMBAHKAN: Import Model EditRequest
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -32,6 +33,7 @@ class FormulirAnalisisPenilaianController extends Controller
      */
     public function store(Request $request, Penilaian $penilaian)
     {
+        // 1. Validasi Input Lengkap (Sesuai File Asli)
         $validatedData = $request->validate([
             'lokasi_kesesuaian_pmp_eksisting' => 'nullable|string',
             'jenis_kesesuaian_pmp_eksisting' => 'nullable|string',
@@ -50,7 +52,7 @@ class FormulirAnalisisPenilaianController extends Controller
             'klb_kesesuaian_rtr' => 'nullable|string',
             'klb_rasio_manual' => 'nullable|string',
             
-            // PERBAIKAN: Menambahkan validasi untuk Ketinggian Bangunan
+            // Kolom Ketinggian Bangunan
             'ketinggian_ketentuan_rtr' => 'nullable|string',
             'ketinggian_kesesuaian_rtr' => 'nullable|string',
 
@@ -68,6 +70,8 @@ class FormulirAnalisisPenilaianController extends Controller
             'gsb_kesesuaian_rtr' => 'nullable|string',
             'jbb_ketentuan_rtr' => 'nullable|string',
             'jbb_kesesuaian_rtr' => 'nullable|string',
+            
+            // Validasi Tanda Tangan
             'tanda_tangan_tim' => 'nullable|array',
             'tanda_tangan_tim.*.user_id' => 'required_with:tanda_tangan_tim|exists:users,id',
             'tanda_tangan_tim.*.signature' => 'required_with:tanda_tangan_tim|string',
@@ -76,32 +80,32 @@ class FormulirAnalisisPenilaianController extends Controller
         try {
             DB::beginTransaction();
 
-            // Proses penyimpanan tanda tangan tim
+            // 2. Proses Penyimpanan Tanda Tangan (Sesuai File Asli)
             $tandaTanganPaths = [];
             if (!empty($validatedData['tanda_tangan_tim'])) {
                 foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
                     if (Str::startsWith($tandaTangan['signature'], 'data:image')) {
+                         // Simpan file baru
                          $path = $this->saveSignature($tandaTangan['signature'], 'ttd_analisis_' . $tandaTangan['user_id']);
                          $tandaTanganPaths[] = [
                             'user_id' => $tandaTangan['user_id'],
                             'signature_path' => $path
                         ];
                     } else {
-                        // Jika bukan base64 baru, asumsikan itu path lama
+                        // Gunakan path lama
                         $tandaTanganPaths[] = [
                             'user_id' => $tandaTangan['user_id'],
-                            'signature_path' => $tandaTangan['signature'] // simpan path yang ada
+                            'signature_path' => $tandaTangan['signature']
                         ];
                     }
                 }
             }
             
-            // Ambil TTD yang sudah ada
+            // Gabungkan dengan TTD yang sudah ada di database
             $existingFormulir = FormulirAnalisisPenilaian::where('penilaian_id', $penilaian->id)->first();
             $existingSignatures = $existingFormulir?->tanda_tangan_tim ?? [];
             $existingSigMap = collect($existingSignatures)->keyBy('user_id');
 
-            // Gabungkan TTD lama dan baru
             foreach ($tandaTanganPaths as $newSig) {
                 $existingSigMap[$newSig['user_id']] = $newSig;
             }
@@ -109,10 +113,24 @@ class FormulirAnalisisPenilaianController extends Controller
             // Masukkan data TTD yang sudah digabung ke validatedData
             $validatedData['tanda_tangan_tim'] = $existingSigMap->values()->all();
 
+            // 3. Simpan/Update Formulir
             $formulir = FormulirAnalisisPenilaian::updateOrCreate(
                 ['penilaian_id' => $penilaian->id],
                 $validatedData
             );
+
+            // --- 4. LOGIKA BARU UNTUK EDIT REQUEST ---
+            // Cek apakah ada edit request yang statusnya 'approved' untuk penilaian ini
+            $activeRequest = EditRequest::where('penilaian_id', $penilaian->id)
+                ->where('status', 'approved')
+                ->latest()
+                ->first();
+
+            // Jika ada, tandai sebagai completed agar form terkunci kembali setelah disimpan
+            if ($activeRequest) {
+                $activeRequest->update(['status' => 'completed']);
+            }
+            // ------------------------------------------
 
             DB::commit();
             return response()->json($formulir, 201);
