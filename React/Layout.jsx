@@ -58,8 +58,15 @@ export default function Layout() {
             setNotifications(prev => prev.filter(n => n.id !== notif.id));
             setIsDropdownOpen(false);
 
-            // C. Arahkan ke halaman tujuan dengan KONTEKS
-            // Asumsi data notif menyimpan 'permohonan_id'
+            // C. Arahkan ke halaman tujuan
+            // --- PERBAIKAN: Cek action_url terlebih dahulu (untuk Edit Request) ---
+            if (notif.data.action_url) {
+                navigate(notif.data.action_url);
+                return;
+            }
+            // --- AKHIR PERBAIKAN ---
+
+            // Fallback: Logic lama untuk AssessmentAssigned (berbasis permohonan_id)
             const permohonanId = notif.data.permohonan_id;
             
             if (permohonanId) {
@@ -179,7 +186,7 @@ export default function Layout() {
                                                             >
                                                                 <div className="flex justify-between items-start">
                                                                     <p className="text-sm font-medium text-gray-800 group-hover:text-blue-700">
-                                                                        Permohonan Baru
+                                                                        {notif.type.includes('EditRequest') ? 'Permohonan Edit' : 'Permohonan Baru'}
                                                                     </p>
                                                                     <span className="text-xs text-gray-400">
                                                                         {new Date(notif.created_at).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'})}
