@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\FormulirAnalisisPenilaian;
 use App\Models\Penilaian;
-use App\Models\EditRequest; // <-- DITAMBAHKAN: Import Model EditRequest
+use App\Models\EditRequest; // Import Model EditRequest
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -33,7 +33,7 @@ class FormulirAnalisisPenilaianController extends Controller
      */
     public function store(Request $request, Penilaian $penilaian)
     {
-        // 1. Validasi Input Lengkap (Sesuai File Asli)
+        // 1. Validasi Input Lengkap
         $validatedData = $request->validate([
             'lokasi_kesesuaian_pmp_eksisting' => 'nullable|string',
             'jenis_kesesuaian_pmp_eksisting' => 'nullable|string',
@@ -80,10 +80,11 @@ class FormulirAnalisisPenilaianController extends Controller
         try {
             DB::beginTransaction();
 
-            // 2. Proses Penyimpanan Tanda Tangan (Sesuai File Asli)
+            // 2. Proses Penyimpanan Tanda Tangan
             $tandaTanganPaths = [];
             if (!empty($validatedData['tanda_tangan_tim'])) {
                 foreach ($validatedData['tanda_tangan_tim'] as $tandaTangan) {
+                    // Cek apakah ini base64 image baru
                     if (Str::startsWith($tandaTangan['signature'], 'data:image')) {
                          // Simpan file baru
                          $path = $this->saveSignature($tandaTangan['signature'], 'ttd_analisis_' . $tandaTangan['user_id']);
@@ -92,7 +93,7 @@ class FormulirAnalisisPenilaianController extends Controller
                             'signature_path' => $path
                         ];
                     } else {
-                        // Gunakan path lama
+                        // Gunakan path lama jika bukan base64 (tidak berubah)
                         $tandaTanganPaths[] = [
                             'user_id' => $tandaTangan['user_id'],
                             'signature_path' => $tandaTangan['signature']
@@ -101,36 +102,44 @@ class FormulirAnalisisPenilaianController extends Controller
                 }
             }
             
-            // Gabungkan dengan TTD yang sudah ada di database
+            // Gabungkan dengan TTD yang sudah ada di database untuk user lain (merge)
             $existingFormulir = FormulirAnalisisPenilaian::where('penilaian_id', $penilaian->id)->first();
             $existingSignatures = $existingFormulir?->tanda_tangan_tim ?? [];
+            
+            // Buat map user_id -> signature data
             $existingSigMap = collect($existingSignatures)->keyBy('user_id');
 
+            // Timpa atau tambah signature baru
             foreach ($tandaTanganPaths as $newSig) {
                 $existingSigMap[$newSig['user_id']] = $newSig;
             }
 
-            // Masukkan data TTD yang sudah digabung ke validatedData
+            // Masukkan data TTD yang sudah digabung kembali ke validatedData
             $validatedData['tanda_tangan_tim'] = $existingSigMap->values()->all();
 
-            // 3. Simpan/Update Formulir
+            // 3. Simpan/Update Formulir ke Database
             $formulir = FormulirAnalisisPenilaian::updateOrCreate(
                 ['penilaian_id' => $penilaian->id],
                 $validatedData
             );
 
-            // --- 4. LOGIKA BARU UNTUK EDIT REQUEST ---
-            // Cek apakah ada edit request yang statusnya 'approved' untuk penilaian ini
+            // --- 4. LOGIKA PENTING: AUTO-LOCK (Set Status Request ke 'Completed') ---
+            // Cek apakah ada edit request yang statusnya 'approved' untuk penilaian ini.
+            // Jika ada, artinya user sedang dalam sesi edit yang diizinkan.
+            // Setelah user menekan tombol simpan, sesi edit dianggap selesai.
             $activeRequest = EditRequest::where('penilaian_id', $penilaian->id)
                 ->where('status', 'approved')
                 ->latest()
                 ->first();
 
-            // Jika ada, tandai sebagai completed agar form terkunci kembali setelah disimpan
+            // Ubah status menjadi 'completed' agar frontend kembali mengunci form (Read-Only)
             if ($activeRequest) {
-                $activeRequest->update(['status' => 'completed']);
+                $activeRequest->update([
+                    'status' => 'completed',
+                    'processed_at' => now()
+                ]);
             }
-            // ------------------------------------------
+            // -----------------------------------------------------------------------
 
             DB::commit();
             return response()->json($formulir, 201);
@@ -143,13 +152,13 @@ class FormulirAnalisisPenilaianController extends Controller
     }
 
     /**
-     * Fungsi helper untuk menyimpan tanda tangan base64
+     * Fungsi helper untuk menyimpan tanda tangan base64 menjadi file.
      */
     private function saveSignature($base64Image, $prefix)
     {
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $type)) {
             $data = substr($base64Image, strpos($base64Image, ',') + 1);
-            $type = strtolower($type[1]);
+            $type = strtolower($type[1]); // jpg, png, gif
 
             if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png'])) {
                 throw new \InvalidArgumentException('Tipe gambar tidak valid.');
