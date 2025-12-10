@@ -17,10 +17,12 @@ class PermohonanPenilaianController extends Controller
     public function index(Request $request)
     {
         // Eager load relasi
+        // PERUBAHAN: Menambahkan 'kasus.penilaian.latestEditRequest' agar status edit muncul di dashboard
         $query = PermohonanPenilaian::with([
             'pemegang', 
             'kasus.penilaian.baPemeriksaan',
             'kasus.penilaian.formulirAnalisis',
+            'kasus.penilaian.latestEditRequest', // <-- DITAMBAHKAN
             'beritaAcara'
         ]);
 
