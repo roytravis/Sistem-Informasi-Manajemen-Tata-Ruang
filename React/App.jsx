@@ -20,10 +20,9 @@ import BeritaAcaraPreviewPage from './pages/BeritaAcaraPreviewPage';
 import BeritaAcaraPemeriksaanPage from './pages/BeritaAcaraPemeriksaanPage';
 import FormulirAnalisisPage from './pages/FormulirAnalisisPage';
 
-// --- IMPORT HALAMAN BARU ---
 import BaHasilPenilaianInputPage from './pages/BaHasilPenilaianInputPage';
 import BaHasilPenilaianPreviewPage from './pages/BaHasilPenilaianPreviewPage';
-import EditApprovalPage from './pages/EditApprovalPage'; // <-- Import Halaman Persetujuan Edit
+import EditApprovalPage from './pages/EditApprovalPage'; // Pastikan import ini ada
 
 function App() {
   return (
@@ -42,27 +41,24 @@ function App() {
           <Route path="pemegangs" element={<PemegangPage />} />
           <Route path="tims" element={<TimPenilaiPage />} />
           
-          {/* Rute untuk Fitur Penilaian */}
           <Route path="penilaian" element={<PenilaianPage />} />
           <Route path="penilaian/tambah" element={<AddPenilaianPage />} />
           <Route path="penilaian/:id/edit" element={<EditPenilaianPage />} />
           <Route path="penilaian/:id" element={<PenilaianDetailPage />} />
           
-          {/* Rute Baru untuk Persetujuan Edit */}
+          {/* Rute untuk Persetujuan Edit (Hanya Ketua Tim/Admin yang idealnya akses, bisa tambah role check di dalam page) */}
           <Route path="penilaian/persetujuan-edit" element={<EditApprovalPage />} />
 
           <Route path="penilaian/berita-acara/tambah" element={<AddBeritaAcaraPage />} />
           <Route path="penilaian/berita-acara/:id/preview" element={<BeritaAcaraPreviewPage />} />
           <Route path="penilaian/:id/berita-acara-pemeriksaan" element={<BeritaAcaraPemeriksaanPage />} />
+          
+          {/* Halaman Formulir Utama dengan fitur Request Edit */}
           <Route path="penilaian/:id/formulir-analisis" element={<FormulirAnalisisPage />} />
 
-          {/* --- RUTE BERITA ACARA HASIL PENILAIAN --- */}
-          {/* Input Form */}
           <Route path="penilaian/:id/ba-hasil/input" element={<BaHasilPenilaianInputPage />} />
-          {/* Preview Result */}
           <Route path="penilaian/:id/ba-hasil/preview" element={<BaHasilPenilaianPreviewPage />} />
           
-          {/* Redirect legacy route to input if needed, or just remove */}
           <Route path="penilaian/:id/ba-hasil" element={<Navigate to="input" replace />} />
         </Route>
       </Route>
