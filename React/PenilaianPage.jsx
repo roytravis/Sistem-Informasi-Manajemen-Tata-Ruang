@@ -199,9 +199,25 @@ export default function PenilaianPage() {
                                         const showAnalisisButton = isSelesaiDinilai && baPemeriksaanDibuat;
                                         const showBaHasilButton = isSelesaiDinilai && formulirAnalisisDibuat; 
 
+                                        // --- LOGIKA BARU: Cek Status Edit Request ---
+                                        const editRequest = p.kasus?.penilaian?.latest_edit_request;
+                                        const isEditMode = editRequest && editRequest.status === 'approved';
+                                        // --------------------------------------------
+
                                         return (
                                         <tr key={p.id} className={`hover:bg-gray-50 ${highlightedId == p.id ? 'bg-blue-50 ring-2 ring-inset ring-blue-200' : ''}`}>
-                                            <td className="py-3 px-4">{p.pemegang?.nama_pelaku_usaha || '-'}</td>
+                                            <td className="py-3 px-4">
+                                                <div>{p.pemegang?.nama_pelaku_usaha || '-'}</div>
+                                                {/* Indikator Mode Edit */}
+                                                {isEditMode && (
+                                                    <div className="mt-1">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200 animate-pulse">
+                                                            <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                                                            Izin Edit Aktif
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="py-3 px-4 font-mono">{p.pemegang?.nomor_identitas || '-'}</td>
                                             <td className="py-3 px-4"><StatusPenilaianBadge permohonan={p} /></td>
                                             <td className="py-3 px-4">
@@ -232,9 +248,10 @@ export default function PenilaianPage() {
                                                     {showAnalisisButton && (
                                                         <button
                                                             onClick={() => navigate(`/penilaian/${p.kasus.penilaian.id}/formulir-analisis`)}
-                                                            className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                                                            className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded-md text-sm relative"
                                                         >
                                                             Analisis
+                                                            {isEditMode && <span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>}
                                                         </button>
                                                     )}
 
