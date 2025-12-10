@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Kasus; // Pastikan ini diimport
 use App\Models\Penilaian; // Pastikan ini diimport
 use App\Models\PermohonanPenilaian; // Pastikan ini diimport
+use App\Models\EditRequest; // <-- TAMBAHAN: Import Model EditRequest
 use Illuminate\Http\Request; // Pastikan ini diimport
 use Illuminate\Validation\Rule; // Pastikan ini diimport
 use Illuminate\Support\Facades\Storage; // Pastikan ini diimport
@@ -213,6 +214,25 @@ class PenilaianController extends Controller
                 $permohonan->update(['status' => 'Menunggu Verifikasi']);
             }
             // --- AKHIR PERBAIKAN ---
+
+            // --- TAMBAHAN BARU: MEKANISME AUTO-LOCK EDIT REQUEST ---
+            // Jika user baru saja menyimpan hasil edit yang disetujui, tandai request sebagai 'completed'
+            // agar form terkunci kembali.
+            if ($penilaian) {
+                $activeRequest = EditRequest::where('penilaian_id', $penilaian->id)
+                    ->where('status', 'approved')
+                    ->latest()
+                    ->first();
+
+                if ($activeRequest) {
+                    $activeRequest->update([
+                        'status' => 'completed',
+                        'processed_at' => now()
+                    ]);
+                    Log::info("Edit request #{$activeRequest->id} marked as completed after successful save.");
+                }
+            }
+            // --- AKHIR TAMBAHAN ---
 
             DB::commit(); // Commit transaksi jika semua berhasil
 
