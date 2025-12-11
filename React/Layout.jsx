@@ -116,6 +116,9 @@ export default function Layout() {
     }, [user, location.pathname]);
 
     const canManage = user && ['Admin', 'Sekretariat'].includes(user.role);
+    // --- PENAMBAHAN: Cek role untuk menu persetujuan ---
+    const canApprove = user && ['Admin', 'Ketua Tim'].includes(user.role);
+    // --- AKHIR PENAMBAHAN ---
     const activeLinkStyle = { color: '#2563EB', fontWeight: '600' };
 
     return (
@@ -130,6 +133,14 @@ export default function Layout() {
                             <NavLink to="/dashboard" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-gray-600 hover:text-blue-600 font-medium text-sm transition-colors">Dashboard Kasus</NavLink>
                             <NavLink to="/penilaian" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-gray-600 hover:text-blue-600 font-medium text-sm transition-colors">Dashboard Penilaian</NavLink>
                             
+                            {/* --- PENAMBAHAN: Menu Persetujuan Edit --- */}
+                            {canApprove && (
+                                <NavLink to="/penilaian/persetujuan-edit" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-gray-600 hover:text-blue-600 font-medium text-sm transition-colors">
+                                    Persetujuan Edit
+                                </NavLink>
+                            )}
+                            {/* --- AKHIR PENAMBAHAN --- */}
+
                             {canManage && (
                                 <>
                                     <NavLink to="/pemegangs" style={({ isActive }) => isActive ? activeLinkStyle : undefined} className="text-gray-600 hover:text-blue-600 font-medium text-sm transition-colors">Pemegang Usaha</NavLink>
