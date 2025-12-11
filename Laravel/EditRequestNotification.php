@@ -27,8 +27,15 @@ class EditRequestNotification extends Notification
     public function toArray($notifiable)
     {
         $penilaian = $this->editRequest->penilaian;
+        
+        // Pastikan relasi kasus dimuat atau akses foreign key langsung
         $pemegang = $penilaian->kasus->pemegang->nama_pelaku_usaha ?? 'N/A';
         $nomor = $penilaian->kasus->nomor_permohonan ?? '-';
+        
+        // PERBAIKAN UTAMA:
+        // 1. Ambil 'kasus_id' karena route frontend /penilaian/:id menggunakan Kasus ID, bukan Penilaian ID.
+        // 2. Ubah action_url untuk mengarah ke PenilaianDetailPage (dashboard detail kasus).
+        $kasusId = $penilaian->kasus_id; 
 
         if ($this->type === 'requested') {
             return [
@@ -36,6 +43,7 @@ class EditRequestNotification extends Notification
                 'edit_request_id' => $this->editRequest->id,
                 'penilaian_id' => $penilaian->id,
                 'message' => "Permohonan edit formulir dari {$this->editRequest->user->nama} untuk kasus #{$nomor} ({$pemegang}).",
+                // URL untuk Ketua Tim memproses (tetap)
                 'action_url' => "/penilaian/persetujuan-edit"
             ];
         } elseif ($this->type === 'approved') {
@@ -43,14 +51,17 @@ class EditRequestNotification extends Notification
                 'type' => 'edit_status',
                 'penilaian_id' => $penilaian->id,
                 'message' => "Permohonan edit Anda untuk kasus #{$nomor} telah DISETUJUI. Silakan edit sekarang.",
-                'action_url' => "/penilaian/{$penilaian->id}/formulir-analisis"
+                // PERBAIKAN: Redirect ke halaman PenilaianDetailPage (/penilaian/{kasus_id})
+                // Sebelumnya salah mengarah ke /formulir-analisis
+                'action_url' => "/penilaian/{$kasusId}" 
             ];
         } elseif ($this->type === 'rejected') {
             return [
                 'type' => 'edit_status',
                 'penilaian_id' => $penilaian->id,
                 'message' => "Permohonan edit Anda untuk kasus #{$nomor} DITOLAK.",
-                'action_url' => "/penilaian/{$penilaian->id}/formulir-analisis"
+                // PERBAIKAN: Redirect ke halaman PenilaianDetailPage agar user bisa melihat alasan penolakan
+                'action_url' => "/penilaian/{$kasusId}" 
             ];
         }
     }
