@@ -151,13 +151,17 @@ const PrintStyles = () => (
                     display: block !important;
                 }
                 
-                .signature-image-container img { height: 60px !important; display: inline-block !important; object-fit: contain; }
+                .signature-image-container img { height: 75px !important; display: inline-block !important; object-fit: contain; }
                 
                 /* Borderless table for layout */
                 .layout-table td { border: none !important; }
                 
                 /* Sub-tables for measurements */
                 .sub-table td { padding-left: 10px !important; }
+
+                /* Grid Layout Fix for Print */
+                .signature-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; column-gap: 2rem !important; row-gap: 2.5rem !important; }
+                .signature-cell { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: flex-start !important; page-break-inside: avoid !important; }
             }
         `}
     </style>
@@ -440,7 +444,7 @@ export default function BeritaAcaraPemeriksaanPage() {
                         <div className="grid md:grid-cols-2 gap-4">
                             {petugasLapanganList.map((member, idx) => (
                                 <div key={member.id} className="bg-white p-3 rounded border shadow-sm">
-                                    <p className="font-bold text-sm text-gray-800 mb-1">{member.nama}</p>
+                                    <p className="font-bold text-sm text-gray-800 mb-1">{member.nama} (Petugas {idx + 1})</p>
                                     <p className="text-xs text-gray-500 mb-2">NIP: {member.nip || '-'}</p>
                                     
                                     {teamSignatures[member.id] && (
@@ -478,6 +482,10 @@ export default function BeritaAcaraPemeriksaanPage() {
     const getPemeriksaan = (idx) => pemeriksaan && pemeriksaan[idx] ? pemeriksaan[idx].pernyataan_mandiri : '-';
     const getPengukuran = (idx) => pengukuran && pengukuran[idx] ? pengukuran[idx].hasil_pengukuran : '-';
 
+    // Pisahkan Petugas Lapangan 1 dan sisanya untuk layout
+    const petugas1 = data.petugasLapangan[0];
+    const sisaPetugas = data.petugasLapangan.slice(1);
+
     return (
         <div className="bg-gray-100 min-h-screen pb-10">
             <PrintStyles />
@@ -497,9 +505,7 @@ export default function BeritaAcaraPemeriksaanPage() {
             {/* HALAMAN 1 (Kurang Lebih) */}
             <div className="printable-area max-w-[21cm] mx-auto bg-white p-8 md:p-12 shadow-lg">
                 
-                {/* 1. KOP SURAT (DIHAPUS SESUAI PERMINTAAN) */}
                 {/* 2. JUDUL (CENTERED) */}
-                {/* PERBAIKAN: Menambahkan text-center dan flex utilities untuk memastikan posisi tengah */}
                 <div className="judul-container text-center w-full mb-6 flex flex-col items-center justify-center">
                     <div className="judul-dokumen font-bold uppercase text-lg leading-snug text-center w-full">
                         BERITA ACARA PEMERIKSAAN DAN PENGUKURAN<br/>
@@ -770,47 +776,71 @@ export default function BeritaAcaraPemeriksaanPage() {
                     Demikian Berita Acara ini dibuat dalam rangkap secukupnya untuk dipergunakan sebagaimana mestinya.
                 </p>
 
-                {/* 9. TANDA TANGAN GRID */}
-                <div className="grid grid-cols-2 gap-8 text-center text-sm page-break-inside-avoid">
-                    {/* Kiri: Pemegang */}
-                    <div>
-                        <p className="mb-4">Pemegang Pernyataan Mandiri Pelaku UMK/ Wakilnya</p>
-                        <div className="signature-image-container h-24 flex items-center justify-center">
+                {/* 9. TANDA TANGAN GRID - REVISI SESUAI JUKNIS */}
+                <div className="signature-grid grid grid-cols-2 gap-x-16 gap-y-12 mt-12 page-break-inside-avoid">
+                    
+                    {/* BARIS 1 KIRI: PEMEGANG */}
+                    <div className="signature-cell flex flex-col items-center justify-start text-center">
+                        <p className="mb-4 font-medium leading-tight">
+                            Pemegang Pernyataan Mandiri Pelaku<br/>UMK/ Wakilnya <sup>1)</sup>
+                        </p>
+                        <div className="signature-image-container h-24 w-full flex items-center justify-center mb-1">
                             {manualData.tandaTanganPemegang && <img src={manualData.tandaTanganPemegang} alt="TTD" />}
                         </div>
-                        <p className="font-bold underline mt-2">{manualData.namaPemegangTTD}</p>
+                        <p className="font-bold underline uppercase">{manualData.namaPemegangTTD}</p>
                     </div>
 
-                    {/* Kanan: Petugas Lapangan (Grid if many) */}
-                    <div>
-                        <div className="flex flex-col gap-6">
-                            {data.petugasLapangan.map((petugas, i) => (
-                                <div key={petugas.id}>
-                                    <p className="mb-2">Petugas Lapangan {i + 1}</p>
-                                    <div className="signature-image-container h-20 flex items-center justify-center">
-                                        {teamSignatures[petugas.id] ? (
-                                            <img src={getSigUrl(teamSignatures[petugas.id])} alt="TTD" crossOrigin="anonymous" />
-                                        ) : <span>(Belum TTD)</span>}
-                                    </div>
-                                    <p className="font-bold underline">{petugas.nama}</p>
-                                    <p>NIP: {petugas.nip || '-'}</p>
+                    {/* BARIS 1 KANAN: PETUGAS 1 */}
+                    <div className="signature-cell flex flex-col items-center justify-start text-center">
+                        {petugas1 ? (
+                            <>
+                                <p className="mb-4 font-medium">Petugas Lapangan 1</p>
+                                <div className="signature-image-container h-24 w-full flex items-center justify-center mb-1">
+                                    {teamSignatures[petugas1.id] ? (
+                                        <img src={getSigUrl(teamSignatures[petugas1.id])} alt="TTD" crossOrigin="anonymous" />
+                                    ) : <span>(Belum TTD)</span>}
                                 </div>
-                            ))}
-                        </div>
+                                <p className="font-bold underline uppercase">{petugas1.nama}</p>
+                                <p>NIP/NIK: {petugas1.nip || '-'}</p>
+                            </>
+                        ) : (
+                            <p className="mt-8 italic text-gray-400">Petugas 1 belum ditetapkan</p>
+                        )}
                     </div>
-                </div>
 
-                {/* Bawah Tengah: Koordinator */}
-                {data.koordinator && (
-                    <div className="text-center mt-10 page-break-inside-avoid">
-                        <p className="mb-4">Koordinator Lapangan</p>
-                        <div className="signature-image-container h-24 flex items-center justify-center">
-                            {manualData.tandaTanganKoordinator && <img src={manualData.tandaTanganKoordinator} alt="TTD" />}
-                        </div>
-                        <p className="font-bold underline mt-2">{manualData.namaKoordinatorTTD}</p>
-                        <p>NIP: {data.koordinator.nip || '-'}</p>
+                    {/* BARIS 2 KIRI: SISA PETUGAS (2 dst) */}
+                    <div className="signature-cell flex flex-col items-center justify-start text-center gap-12">
+                        {sisaPetugas.length > 0 ? sisaPetugas.map((petugas, i) => (
+                            <div key={petugas.id} className="w-full">
+                                <p className="mb-4 font-medium">Petugas Lapangan {i + 2}{sisaPetugas.length > 1 ? '' : ', dst.'}</p>
+                                <div className="signature-image-container h-24 w-full flex items-center justify-center mb-1">
+                                    {teamSignatures[petugas.id] ? (
+                                        <img src={getSigUrl(teamSignatures[petugas.id])} alt="TTD" crossOrigin="anonymous" />
+                                    ) : <span>(Belum TTD)</span>}
+                                </div>
+                                <p className="font-bold underline uppercase">{petugas.nama}</p>
+                                <p>NIP/NIK: {petugas.nip || '-'}</p>
+                            </div>
+                        )) : null}
                     </div>
-                )}
+
+                    {/* BARIS 2 KANAN: KOORDINATOR (SELALU DI KANAN BAWAH) */}
+                    {/* Menggunakan flex-col-reverse atau margin-top auto jika perlu didorong ke paling bawah, 
+                        tapi grid standard biasanya sudah cukup sejajar dengan row Petugas 2 */}
+                    <div className="signature-cell flex flex-col items-center justify-start text-center">
+                        {data.koordinator && (
+                            <>
+                                <p className="mb-4 font-medium">Koordinator Lapangan,</p>
+                                <div className="signature-image-container h-24 w-full flex items-center justify-center mb-1">
+                                    {manualData.tandaTanganKoordinator && <img src={manualData.tandaTanganKoordinator} alt="TTD" />}
+                                </div>
+                                <p className="font-bold underline uppercase">{manualData.namaKoordinatorTTD}</p>
+                                <p>NIP: {data.koordinator.nip || '-'}</p>
+                            </>
+                        )}
+                    </div>
+
+                </div>
             </div>
         </div>
     );
