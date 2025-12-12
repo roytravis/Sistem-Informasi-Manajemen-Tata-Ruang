@@ -126,22 +126,29 @@ const PrintStyles = () => (
                 tr { page-break-inside: avoid !important; }
                 td { vertical-align: top !important; padding: 2px 4px !important; }
                 
-                /* STYLE JUDUL diperbaiki agar center tanpa underline */
+                /* STYLE JUDUL & HEADER - FIXED CENTER ALIGNMENT */
                 .judul-container {
                     text-align: center !important;
                     width: 100% !important;
-                    margin-bottom: 20px;
+                    margin-bottom: 20px !important;
+                    display: block !important;
                 }
                 .judul-dokumen { 
-                    font-weight: bold; 
-                    text-transform: uppercase; 
-                    font-size: 12pt;
-                    line-height: 1.5;
-                    margin-bottom: 5px;
+                    font-weight: bold !important; 
+                    text-transform: uppercase !important; 
+                    font-size: 12pt !important;
+                    line-height: 1.5 !important;
+                    margin-bottom: 5px !important;
+                    text-align: center !important;
+                    width: 100% !important;
+                    display: block !important;
                 }
                 .nomor-dokumen {
-                    font-size: 12pt;
-                    margin-top: 5px;
+                    font-size: 12pt !important;
+                    margin-top: 5px !important;
+                    text-align: center !important;
+                    width: 100% !important;
+                    display: block !important;
                 }
                 
                 .signature-image-container img { height: 60px !important; display: inline-block !important; object-fit: contain; }
@@ -492,12 +499,13 @@ export default function BeritaAcaraPemeriksaanPage() {
                 
                 {/* 1. KOP SURAT (DIHAPUS SESUAI PERMINTAAN) */}
                 {/* 2. JUDUL (CENTERED) */}
-                <div className="judul-container">
-                    <div className="judul-dokumen">
+                {/* PERBAIKAN: Menambahkan text-center dan flex utilities untuk memastikan posisi tengah */}
+                <div className="judul-container text-center w-full mb-6 flex flex-col items-center justify-center">
+                    <div className="judul-dokumen font-bold uppercase text-lg leading-snug text-center w-full">
                         BERITA ACARA PEMERIKSAAN DAN PENGUKURAN<br/>
                         PERNYATAAN MANDIRI PELAKU USAHA MIKRO DAN KECIL
                     </div>
-                    <div className="nomor-dokumen">
+                    <div className="nomor-dokumen mt-2 text-base text-center w-full">
                         Nomor: {manualData.nomorBa}
                     </div>
                 </div>
