@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../axios'; 
+import api from '../api/axios'; 
 
-// --- KOMPONEN KANVAS TANDA TANGAN KUSTOM (Tanpa Library) ---
+// --- KOMPONEN KANVAS TANDA TANGAN KUSTOM ---
 const SimpleSignaturePad = forwardRef((props, ref) => {
     const canvasRef = useRef(null);
     const [isEmpty, setIsEmpty] = useState(true);
@@ -17,7 +17,17 @@ const SimpleSignaturePad = forwardRef((props, ref) => {
         toDataURL: () => {
             return canvasRef.current.toDataURL();
         },
-        isEmpty: () => isEmpty
+        isEmpty: () => isEmpty,
+        fromDataURL: (url) => {
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.src = url;
+            img.onload = () => {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                setIsEmpty(false);
+            };
+        }
     }));
 
     useEffect(() => {
@@ -37,7 +47,6 @@ const SimpleSignaturePad = forwardRef((props, ref) => {
 
         const getPos = (e) => {
             const rect = canvas.getBoundingClientRect();
-            // Handle touch vs mouse
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             return {
@@ -71,7 +80,6 @@ const SimpleSignaturePad = forwardRef((props, ref) => {
             }
         };
 
-        // Event Listeners
         canvas.addEventListener('mousedown', startDrawing);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDrawing);
@@ -81,7 +89,6 @@ const SimpleSignaturePad = forwardRef((props, ref) => {
         canvas.addEventListener('touchend', stopDrawing);
 
         return () => {
-            // Cleanup
             if (canvas) {
                 canvas.removeEventListener('mousedown', startDrawing);
                 canvas.removeEventListener('mousemove', draw);
@@ -104,31 +111,49 @@ const SimpleSignaturePad = forwardRef((props, ref) => {
 });
 SimpleSignaturePad.displayName = 'SimpleSignaturePad';
 
-// --- STYLING CETAK ---
+// --- STYLING CETAK (Sesuai PDF) ---
 const PrintStyles = () => (
     <style>
         {`
-            @page { size: A4; margin: 2cm 1.5cm; }
+            @page { size: A4; margin: 1.5cm 2cm; }
             @media print {
                 body * { visibility: hidden !important; }
                 .printable-area, .printable-area * { visibility: visible !important; }
-                .printable-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; font-size: 12pt; color: #000; background-color: #fff !important; }
+                .printable-area { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; font-size: 11pt; color: #000; background-color: #fff !important; font-family: 'Times New Roman', Times, serif; }
                 .no-print { display: none !important; }
-                .printable-area table { width: 100% !important; border-collapse: collapse !important; }
-                .printable-area tr { page-break-inside: avoid !important; }
-                .printable-area th, .printable-area td { border: 1px solid #000 !important; padding: 4px 6px !important; vertical-align: top !important; }
-                .signature-block { page-break-inside: avoid !important; }
-                .signature-image-container img { max-height: 5rem !important; display: inline-block !important; }
+                
+                table { width: 100% !important; border-collapse: collapse !important; margin-bottom: 1em !important; }
+                tr { page-break-inside: avoid !important; }
+                td { vertical-align: top !important; padding: 2px 4px !important; }
+                
+                /* STYLE JUDUL diperbaiki agar center tanpa underline */
+                .judul-container {
+                    text-align: center !important;
+                    width: 100% !important;
+                    margin-bottom: 20px;
+                }
+                .judul-dokumen { 
+                    font-weight: bold; 
+                    text-transform: uppercase; 
+                    font-size: 12pt;
+                    line-height: 1.5;
+                    margin-bottom: 5px;
+                }
+                .nomor-dokumen {
+                    font-size: 12pt;
+                    margin-top: 5px;
+                }
+                
+                .signature-image-container img { height: 60px !important; display: inline-block !important; object-fit: contain; }
+                
+                /* Borderless table for layout */
+                .layout-table td { border: none !important; }
+                
+                /* Sub-tables for measurements */
+                .sub-table td { padding-left: 10px !important; }
             }
         `}
     </style>
-);
-
-const DataRow = ({ label, value, unit = '' }) => (
-    <tr>
-        <td className="w-2/5 p-2 border border-gray-300">{label}</td>
-        <td className="w-3/5 p-2 border border-gray-300">{value || '-'} {unit.replace(/&sup2;/g, '²')}</td>
-    </tr>
 );
 
 export default function BeritaAcaraPemeriksaanPage() {
@@ -147,10 +172,7 @@ export default function BeritaAcaraPemeriksaanPage() {
         namaKoordinatorTTD: '',
     });
     
-    // State Tanda Tangan Tim (Dinamis)
-    // Format: { [userId]: base64String }
     const [teamSignatures, setTeamSignatures] = useState({});
-    
     const [isDataSubmitted, setIsDataSubmitted] = useState(false);
     const [manualError, setManualError] = useState('');
     const [submitManualLoading, setSubmitManualLoading] = useState(false);
@@ -158,7 +180,7 @@ export default function BeritaAcaraPemeriksaanPage() {
     // Refs
     const pemegangSigRef = useRef(null);
     const koordinatorSigRef = useRef(null);
-    const teamSigRefs = useRef({}); // Refs dinamis untuk tim
+    const teamSigRefs = useRef({}); 
 
     // 1. FETCH DATA
     useEffect(() => {
@@ -178,7 +200,6 @@ export default function BeritaAcaraPemeriksaanPage() {
                 try {
                     const baRes = await api.get(`/ba-pemeriksaan/${response.data.penilaian.id}`);
                     if (baRes.data) {
-                        // Hydrate Data Utama
                         setManualData({
                             nomorBa: baRes.data.nomor_ba || '',
                             nomorSpt: baRes.data.nomor_spt || '',
@@ -188,21 +209,17 @@ export default function BeritaAcaraPemeriksaanPage() {
                             namaKoordinatorTTD: baRes.data.nama_koordinator || response.data.penanggung_jawab?.nama || '',
                         });
 
-                        // Hydrate Data Tim
                         if (baRes.data.tanda_tangan_tim && Array.isArray(baRes.data.tanda_tangan_tim)) {
                             const teamSigs = {};
                             baRes.data.tanda_tangan_tim.forEach(sig => {
-                                // Simpan path (bukan base64) ke state
                                 if (sig.signature_path) {
                                     teamSigs[sig.user_id] = sig.signature_path; 
                                 }
                             });
                             setTeamSignatures(teamSigs);
                         }
-
                         setIsDataSubmitted(true);
                     } else {
-                        // Data Baru
                         setManualData(prev => ({
                             ...prev,
                             namaPemegangTTD: response.data.pemegang?.nama_pelaku_usaha || '',
@@ -220,17 +237,14 @@ export default function BeritaAcaraPemeriksaanPage() {
         fetchBaData();
     }, [id]);
 
-    // 2. DATA PROCESSING (MEMOIZED)
-    // PERBAIKAN: useMemo ini mengembalikan { processedData, petugasLapanganList }
-    // processedData adalah objek data utama (bukan nested lagi).
+    // 2. DATA PROCESSING
     const { processedData, petugasLapanganList } = useMemo(() => {
         if (!kasus) return { processedData: null, petugasLapanganList: [] };
 
         const { pemegang, penilaian, tim, penanggung_jawab } = kasus;
         const petugas = tim?.users?.filter(u => u.pivot?.jabatan_di_tim === 'Petugas Lapangan') || [];
 
-        // Data untuk Preview
-        const tgl = new Date(); // Atau tanggal dari DB
+        const tgl = new Date();
         const tanggalBA = {
             hari: tgl.toLocaleDateString('id-ID', { weekday: 'long' }),
             tanggal: tgl.getDate(),
@@ -246,7 +260,6 @@ export default function BeritaAcaraPemeriksaanPage() {
                 koordinator: penanggung_jawab,
                 petugasLapangan: petugas,
                 tanggalBA,
-                // Data Pemeriksaan/Pengukuran bisa diambil dari penilaian->pemeriksaan
                 pemeriksaan: penilaian?.pemeriksaan || [],
                 pengukuran: penilaian?.pengukuran || []
             }
@@ -259,18 +272,15 @@ export default function BeritaAcaraPemeriksaanPage() {
         setManualData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Fungsi Submit Form
     const handleDataSubmit = async (e) => {
         e.preventDefault();
         setManualError('');
 
-        // Validasi Dasar
         if (!manualData.nomorBa || !manualData.nomorSpt || !manualData.namaPemegangTTD) {
             setManualError('Harap lengkapi Nomor BA, SPT, dan Nama Pemegang.');
             return;
         }
 
-        // Ambil Signature Data (Priority: Canvas > Existing State)
         const pemegangSig = pemegangSigRef.current?.isEmpty() === false 
             ? pemegangSigRef.current.toDataURL() 
             : manualData.tandaTanganPemegang;
@@ -288,17 +298,13 @@ export default function BeritaAcaraPemeriksaanPage() {
             return;
         }
 
-        // Proses Signature Tim
         const teamPayload = [];
         let missingTeamSig = false;
 
         petugasLapanganList.forEach(member => {
             const ref = teamSigRefs.current[member.id];
             const existing = teamSignatures[member.id];
-            
-            // Cek apakah ada signature baru di canvas
             const hasNew = ref && !ref.isEmpty();
-            // Cek apakah ada signature lama (path/url)
             const hasOld = !!existing;
 
             if (hasNew) {
@@ -306,14 +312,14 @@ export default function BeritaAcaraPemeriksaanPage() {
                     user_id: member.id,
                     nama: member.nama,
                     nip: member.nip,
-                    signature: ref.toDataURL() // Base64 baru
+                    signature: ref.toDataURL()
                 });
             } else if (hasOld) {
                 teamPayload.push({
                     user_id: member.id,
                     nama: member.nama,
                     nip: member.nip,
-                    signature: existing // Path lama (dikirim balik)
+                    signature: existing
                 });
             } else {
                 missingTeamSig = true;
@@ -335,19 +341,17 @@ export default function BeritaAcaraPemeriksaanPage() {
                 tanda_tangan_pemegang: pemegangSig,
                 nama_koordinator: manualData.namaKoordinatorTTD,
                 tanda_tangan_koordinator: koordinatorSig,
-                tanda_tangan_tim: teamPayload, // Array baru
+                tanda_tangan_tim: teamPayload,
             };
 
             const response = await api.post('/ba-pemeriksaan', payload);
             
-            // Update State dengan data dari server
             setManualData(prev => ({
                 ...prev,
                 tandaTanganPemegang: response.data.tanda_tangan_pemegang,
                 tandaTanganKoordinator: response.data.tanda_tangan_koordinator
             }));
 
-            // Update Team Signatures dengan Path dari server
             const newTeamSigs = {};
             if (response.data.tanda_tangan_tim) {
                 response.data.tanda_tangan_tim.forEach(s => {
@@ -355,7 +359,6 @@ export default function BeritaAcaraPemeriksaanPage() {
                 });
             }
             setTeamSignatures(newTeamSigs);
-
             setIsDataSubmitted(true);
         } catch (err) {
             setManualError(err.response?.data?.message || 'Gagal menyimpan data.');
@@ -364,18 +367,16 @@ export default function BeritaAcaraPemeriksaanPage() {
         }
     };
 
-    // Helper URL Gambar
     const getSigUrl = (path) => {
         if (!path) return null;
-        if (path.startsWith('data:image')) return path; // Base64
-        return `${api.defaults.baseURL}/signatures/${path.split('/').pop()}`; // URL file
+        if (path.startsWith('data:image')) return path;
+        return `${api.defaults.baseURL}/signatures/${path.split('/').pop()}`;
     };
 
-    // --- RENDER ---
     if (loading) return <div className="text-center py-10">Memuat Formulir...</div>;
     if (error) return <div className="p-4 bg-red-100 text-red-700 m-4 rounded">{error}</div>;
 
-    // --- 1. MODE INPUT FORM ---
+    // --- 1. MODE INPUT FORM (Tampilan Web) ---
     if (!isDataSubmitted) {
         return (
             <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg mt-8">
@@ -384,99 +385,75 @@ export default function BeritaAcaraPemeriksaanPage() {
                 </div>
                 
                 <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">
-                    Formulir Berita Acara Pemeriksaan
+                    Formulir Input Berita Acara Pemeriksaan
                 </h2>
 
                 {manualError && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{manualError}</div>}
 
                 <form onSubmit={handleDataSubmit} className="space-y-6">
-                    {/* A. Info Dokumen */}
                     <div className="grid md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Nomor Berita Acara *</label>
-                            <input type="text" name="nomorBa" value={manualData.nomorBa} onChange={handleManualChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
+                            <input type="text" name="nomorBa" value={manualData.nomorBa} onChange={handleManualChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" required placeholder="Contoh: 123/BA/TR/2025" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Nomor Surat Perintah Tugas (SPT) *</label>
-                            <input type="text" name="nomorSpt" value={manualData.nomorSpt} onChange={handleManualChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
+                            <input type="text" name="nomorSpt" value={manualData.nomorSpt} onChange={handleManualChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" required placeholder="Contoh: 456/SPT/TR/2025" />
                         </div>
                     </div>
 
-                    {/* B. Tanda Tangan Pemegang */}
-                    <div className="border p-4 rounded bg-gray-50">
-                        <h3 className="font-semibold text-gray-800 mb-3">B. Tanda Tangan Pemegang</h3>
-                        <div className="mb-3">
-                            <label className="block text-sm font-medium text-gray-700">Nama Penandatangan *</label>
-                            <input type="text" name="namaPemegangTTD" value={manualData.namaPemegangTTD} onChange={handleManualChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm" required />
+                    {/* Form Tanda Tangan */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {/* 1. Pemegang */}
+                        <div className="border p-4 rounded bg-gray-50">
+                            <h3 className="font-semibold text-gray-800 mb-2">1. Pemegang / Pelaku Usaha</h3>
+                            <input type="text" name="namaPemegangTTD" value={manualData.namaPemegangTTD} onChange={handleManualChange} className="mb-2 w-full border-gray-300 rounded-md shadow-sm p-1 text-sm" placeholder="Nama Lengkap" required />
+                            <div className="border border-gray-400 bg-white rounded w-full h-32">
+                                <SimpleSignaturePad ref={pemegangSigRef} canvasProps={{ className: 'w-full h-full' }} />
+                            </div>
+                            <button type="button" onClick={() => pemegangSigRef.current?.clear()} className="text-xs text-blue-600 mt-1 hover:underline">Hapus / Ulangi</button>
                         </div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tanda Tangan *</label>
-                        {manualData.tandaTanganPemegang && (
-                            <div className="mb-2">
-                                <img src={manualData.tandaTanganPemegang} className="h-16 border bg-white" alt="TTD Tersimpan" />
-                                <p className="text-xs text-green-600 mt-1">✓ Tanda tangan tersimpan. Gunakan canvas di bawah untuk mengubah.</p>
+
+                        {/* 2. Koordinator */}
+                        {kasus.penanggung_jawab && (
+                            <div className="border p-4 rounded bg-gray-50">
+                                <h3 className="font-semibold text-gray-800 mb-2">2. Koordinator Lapangan</h3>
+                                <input type="text" name="namaKoordinatorTTD" value={manualData.namaKoordinatorTTD} onChange={handleManualChange} className="mb-2 w-full border-gray-300 rounded-md shadow-sm p-1 text-sm" placeholder="Nama Lengkap" required />
+                                <div className="border border-gray-400 bg-white rounded w-full h-32">
+                                    <SimpleSignaturePad ref={koordinatorSigRef} canvasProps={{ className: 'w-full h-full' }} />
+                                </div>
+                                <button type="button" onClick={() => koordinatorSigRef.current?.clear()} className="text-xs text-blue-600 mt-1 hover:underline">Hapus / Ulangi</button>
                             </div>
                         )}
-                        <div className="border border-gray-400 bg-white rounded w-full h-32 relative">
-                            <SimpleSignaturePad ref={pemegangSigRef} canvasProps={{ className: 'w-full h-full' }} />
-                        </div>
-                        <button type="button" onClick={() => pemegangSigRef.current?.clear()} className="text-xs text-blue-600 mt-1 hover:underline">Hapus Tanda Tangan</button>
                     </div>
 
-                    {/* C. Tanda Tangan Tim Penilai */}
+                    {/* 3. Tim Penilai */}
                     <div className="border p-4 rounded bg-blue-50">
-                        <h3 className="font-semibold text-blue-800 mb-3">C. Tanda Tangan Tim Penilai</h3>
-                        <p className="text-sm text-blue-600 mb-4">Seluruh anggota tim yang terdaftar wajib membubuhkan tanda tangan.</p>
-                        
-                        <div className="grid md:grid-cols-2 gap-6">
-                            {/* Loop Anggota Tim */}
+                        <h3 className="font-semibold text-blue-800 mb-3">3. Tim Penilai (Petugas Lapangan)</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
                             {petugasLapanganList.map((member, idx) => (
                                 <div key={member.id} className="bg-white p-3 rounded border shadow-sm">
-                                    <p className="font-bold text-sm text-gray-800">Petugas {idx + 1}: {member.nama}</p>
+                                    <p className="font-bold text-sm text-gray-800 mb-1">{member.nama}</p>
                                     <p className="text-xs text-gray-500 mb-2">NIP: {member.nip || '-'}</p>
                                     
                                     {teamSignatures[member.id] && (
-                                        <div className="mb-2">
-                                            <img src={getSigUrl(teamSignatures[member.id])} className="h-12 border bg-gray-50" alt="TTD Tersimpan" crossOrigin="anonymous" />
-                                            <p className="text-xs text-green-600">✓ Tersimpan</p>
+                                        <div className="mb-2 text-center bg-gray-100 p-1 rounded">
+                                            <span className="text-xs text-green-600">✓ TTD Tersimpan</span>
                                         </div>
                                     )}
                                     
                                     <div className="border border-gray-300 bg-gray-50 rounded h-24 relative">
-                                        <SimpleSignaturePad 
-                                            ref={el => teamSigRefs.current[member.id] = el}
-                                            canvasProps={{ className: 'w-full h-full' }} 
-                                        />
+                                        <SimpleSignaturePad ref={el => teamSigRefs.current[member.id] = el} canvasProps={{ className: 'w-full h-full' }} />
                                     </div>
-                                    <button type="button" onClick={() => teamSigRefs.current[member.id]?.clear()} className="text-xs text-blue-600 mt-1 hover:underline">Hapus</button>
+                                    <button type="button" onClick={() => teamSigRefs.current[member.id]?.clear()} className="text-xs text-blue-600 mt-1 hover:underline">Hapus / Ulangi</button>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* D. Tanda Tangan Koordinator */}
-                    {kasus.penanggung_jawab && (
-                        <div className="border p-4 rounded bg-gray-50">
-                            <h3 className="font-semibold text-gray-800 mb-3">D. Tanda Tangan Koordinator Lapangan</h3>
-                            <div className="mb-3">
-                                <label className="block text-sm font-medium text-gray-700">Nama Koordinator *</label>
-                                <input type="text" name="namaKoordinatorTTD" value={manualData.namaKoordinatorTTD} onChange={handleManualChange} className="mt-1 w-full border-gray-300 rounded-md shadow-sm" required />
-                            </div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanda Tangan *</label>
-                            {manualData.tandaTanganKoordinator && (
-                                <div className="mb-2">
-                                    <img src={manualData.tandaTanganKoordinator} className="h-16 border bg-white" alt="TTD Tersimpan" />
-                                </div>
-                            )}
-                            <div className="border border-gray-400 bg-white rounded w-full h-32 relative">
-                                <SimpleSignaturePad ref={koordinatorSigRef} canvasProps={{ className: 'w-full h-full' }} />
-                            </div>
-                            <button type="button" onClick={() => koordinatorSigRef.current?.clear()} className="text-xs text-blue-600 mt-1 hover:underline">Hapus Tanda Tangan</button>
-                        </div>
-                    )}
-
                     <div className="flex justify-end pt-4">
                         <button type="submit" disabled={submitManualLoading} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded shadow-lg disabled:bg-green-300">
-                            {submitManualLoading ? 'Menyimpan...' : 'Simpan & Lanjutkan ke BA'}
+                            {submitManualLoading ? 'Menyimpan...' : 'Simpan & Tampilkan BA'}
                         </button>
                     </div>
                 </form>
@@ -484,114 +461,348 @@ export default function BeritaAcaraPemeriksaanPage() {
         );
     }
 
-    // --- 2. MODE PREVIEW DOKUMEN ---
-    // PERBAIKAN: Variabel processedData SUDAH berisi objek data. Tidak perlu destructuring { processedData: data } lagi.
-    const data = processedData; // Ganti alias agar sesuai dengan penggunaan di bawah
-    const { pemegang } = data; // Ambil pemegang dari data
+    // --- 2. MODE PREVIEW DOKUMEN (Sesuai PDF) ---
+    const data = processedData; 
+    if (!data || !data.tanggalBA) return <div className="text-center py-10">Memuat data dokumen...</div>;
+
+    const { pemegang, pemeriksaan, pengukuran } = data;
+
+    // Helper Values
+    const getPemeriksaan = (idx) => pemeriksaan && pemeriksaan[idx] ? pemeriksaan[idx].pernyataan_mandiri : '-';
+    const getPengukuran = (idx) => pengukuran && pengukuran[idx] ? pengukuran[idx].hasil_pengukuran : '-';
 
     return (
-        <div>
+        <div className="bg-gray-100 min-h-screen pb-10">
             <PrintStyles />
-            {/* Header Toolbar */}
+            {/* Toolbar */}
             <div className="mb-6 flex justify-between items-center no-print px-4 py-3 bg-white shadow-sm sm:px-6 lg:px-8">
                 <div>
                     <button onClick={() => setIsDataSubmitted(false)} className="text-blue-600 hover:underline text-sm mr-4 font-semibold">
-                        &larr; Ubah Data / Tanda Tangan
+                        &larr; Ubah Data
                     </button>
                     <Link to="/penilaian" className="text-gray-500 hover:underline text-sm">Kembali ke Dashboard</Link>
                 </div>
-                <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow">
+                <button onClick={() => window.print()} className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded shadow">
                     Cetak PDF
                 </button>
             </div>
 
-            {/* Dokumen Preview */}
-            <div className="printable-area max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8 md:p-12 font-serif text-black leading-relaxed">
-                {/* Judul */}
-                <div className="text-center uppercase font-bold mb-8">
-                    <h2 className="text-lg underline">BERITA ACARA PEMERIKSAAN DAN PENGUKURAN</h2>
-                    <h3 className="text-lg">PERNYATAAN MANDIRI PELAKU USAHA MIKRO DAN KECIL</h3>
-                    <p className="text-base normal-case mt-2">Nomor: {manualData.nomorBa}</p>
+            {/* HALAMAN 1 (Kurang Lebih) */}
+            <div className="printable-area max-w-[21cm] mx-auto bg-white p-8 md:p-12 shadow-lg">
+                
+                {/* 1. KOP SURAT (DIHAPUS SESUAI PERMINTAAN) */}
+                {/* 2. JUDUL (CENTERED) */}
+                <div className="judul-container">
+                    <div className="judul-dokumen">
+                        BERITA ACARA PEMERIKSAAN DAN PENGUKURAN<br/>
+                        PERNYATAAN MANDIRI PELAKU USAHA MIKRO DAN KECIL
+                    </div>
+                    <div className="nomor-dokumen">
+                        Nomor: {manualData.nomorBa}
+                    </div>
                 </div>
 
-                {/* Isi Pembuka */}
-                <div className="text-justify mb-4">
-                    <p className="indent-8 mb-2">
-                        Pada hari ini, {data.tanggalBA.hari} tanggal {data.tanggalBA.tanggal} bulan {data.tanggalBA.bulan} tahun {data.tanggalBA.tahun}, 
-                        kami yang bertanda tangan di bawah ini:
-                    </p>
-                    {/* List Petugas */}
-                    <ol className="list-decimal pl-6 mb-4 space-y-1">
-                        {[data.koordinator, ...data.petugasLapangan].filter(Boolean).map((p, i) => (
-                            <li key={i}>
-                                <span className="inline-block w-40 font-semibold">{p.nama}</span>
-                                <span className="inline-block">({p.role === 'Koordinator Lapangan' ? 'Koordinator' : 'Petugas Lapangan'})</span>
-                            </li>
-                        ))}
-                    </ol>
-                    <p className="indent-8 mb-4">
-                        Berdasarkan Surat Perintah Tugas Nomor <strong>{manualData.nomorSpt}</strong>, telah melakukan pemeriksaan dan pengukuran terhadap lokasi kegiatan:
-                    </p>
-                </div>
+                {/* 3. PEMBUKAAN */}
+                <p className="text-justify mb-2">
+                    Pada hari ini, tanggal {data.tanggalBA.tanggal} bulan {data.tanggalBA.bulan} tahun {data.tanggalBA.tahun}, yang bertanda tangan di bawah ini:
+                </p>
 
-                {/* Data Pemegang */}
-                <h4 className="font-bold mb-2">1. Pelaku Usaha</h4>
-                <table className="w-full border mb-4 text-sm">
+                {/* 4. LIST PETUGAS */}
+                <table className="layout-table mb-4">
                     <tbody>
-                        <DataRow label="Nama Pelaku Usaha" value={pemegang?.nama_pelaku_usaha} />
-                        <DataRow label="Nomor Identitas" value={pemegang?.nomor_identitas} />
-                        <DataRow label="Alamat" value={pemegang?.alamat} />
+                        {/* Koordinator */}
+                        {data.koordinator && (
+                            <tr>
+                                <td width="30">1.</td>
+                                <td width="150">Nama</td>
+                                <td width="10">:</td>
+                                <td>{data.koordinator.nama}</td>
+                            </tr>
+                        )}
+                        {data.koordinator && (
+                            <tr>
+                                <td></td>
+                                <td>NIP/NIK</td>
+                                <td>:</td>
+                                <td>{data.koordinator.nip || '-'}</td>
+                            </tr>
+                        )}
+                        {data.koordinator && (
+                            <tr>
+                                <td></td>
+                                <td>Jabatan</td>
+                                <td>:</td>
+                                <td>Koordinator Lapangan</td>
+                            </tr>
+                        )}
+
+                        {/* Petugas Lapangan Loop */}
+                        {data.petugasLapangan.map((petugas, i) => (
+                            <>
+                                <tr key={`name-${i}`}>
+                                    <td width="30">{i + (data.koordinator ? 2 : 1)}.</td>
+                                    <td width="150">Nama</td>
+                                    <td width="10">:</td>
+                                    <td>{petugas.nama}</td>
+                                </tr>
+                                <tr key={`nip-${i}`}>
+                                    <td></td>
+                                    <td>NIP/NIK</td>
+                                    <td>:</td>
+                                    <td>{petugas.nip || '-'}</td>
+                                </tr>
+                                <tr key={`jab-${i}`}>
+                                    <td></td>
+                                    <td>Jabatan</td>
+                                    <td>:</td>
+                                    <td>Petugas Lapangan</td>
+                                </tr>
+                            </>
+                        ))}
                     </tbody>
                 </table>
 
-                {/* Detail Pemeriksaan (Sample Data) */}
-                <h4 className="font-bold mb-2">2. Hasil Pemeriksaan Lapangan</h4>
-                <div className="mb-4 text-sm border p-2">
-                    <p><i>Detail hasil pemeriksaan dan pengukuran sesuai Formulir Analisis yang terlampir.</i></p>
+                {/* 5. DASAR SPT */}
+                <p className="text-justify mb-4">
+                    Berdasarkan Surat Perintah Tugas Nomor <strong>{manualData.nomorSpt}</strong>, telah melakukan pemeriksaan dan pengukuran terhadap lokasi kegiatan Pemanfaatan Ruang dengan hasil sebagai berikut:
+                </p>
+
+                <div className="text-center font-bold mb-4">
+                    Hasil Pemeriksaan dan Pengukuran<br/>
+                    Pernyataan Mandiri Pelaku Usaha Mikro dan Kecil
                 </div>
 
-                <p className="mt-6">Demikian Berita Acara ini dibuat untuk dipergunakan sebagaimana mestinya.</p>
+                {/* 6. IDENTITAS PELAKU USAHA */}
+                <table className="layout-table mb-4">
+                    <tbody>
+                        <tr>
+                            <td width="200">Nama Pelaku Usaha</td>
+                            <td width="10">:</td>
+                            <td>{pemegang.nama_pelaku_usaha}</td>
+                        </tr>
+                        <tr>
+                            <td>Nomor Identitas</td>
+                            <td>:</td>
+                            <td>{pemegang.nomor_identitas}</td>
+                        </tr>
+                        <tr>
+                            <td>Alamat</td>
+                            <td>:</td>
+                            <td>{pemegang.alamat}</td>
+                        </tr>
+                        <tr>
+                            <td>Nomor Telepon</td>
+                            <td>:</td>
+                            <td>{pemegang.nomor_handphone || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td>Email</td>
+                            <td>:</td>
+                            <td>{pemegang.email || '-'}</td>
+                        </tr>
+                    </tbody>
+                </table>
 
-                {/* Area Tanda Tangan */}
-                <div className="mt-8 pt-4">
-                    {/* Row 1: Pemegang & Koordinator */}
-                    <div className="grid grid-cols-2 gap-8 text-center mb-8">
-                        <div className="signature-block">
-                            <p className="mb-2">Pemegang Pernyataan Mandiri</p>
-                            <div className="signature-image-container h-24 flex items-center justify-center">
-                                {manualData.tandaTanganPemegang && <img src={manualData.tandaTanganPemegang} alt="TTD Pemegang" className="h-full object-contain" />}
-                            </div>
-                            <p className="font-bold underline mt-2">{manualData.namaPemegangTTD}</p>
+                {/* 7. A. PEMERIKSAAN */}
+                <div className="font-bold mb-2">A. Pemeriksaan</div>
+                <table className="layout-table mb-2 sub-table">
+                    <tbody>
+                        <tr>
+                            <td width="200" className="font-semibold">Lokasi Usaha</td>
+                            <td colSpan="2"></td>
+                        </tr>
+                        <tr>
+                            <td>Alamat</td>
+                            <td width="10">:</td>
+                            <td>{getPemeriksaan(0)}</td>
+                        </tr>
+                        <tr>
+                            <td>Desa/Kelurahan</td>
+                            <td>:</td>
+                            <td>{getPemeriksaan(1)}</td>
+                        </tr>
+                        <tr>
+                            <td>Kecamatan</td>
+                            <td>:</td>
+                            <td>{getPemeriksaan(2)}</td>
+                        </tr>
+                        <tr>
+                            <td>Kabupaten/Kota</td>
+                            <td>:</td>
+                            <td>{getPemeriksaan(3)}</td>
+                        </tr>
+                        <tr>
+                            <td>Provinsi</td>
+                            <td>:</td>
+                            <td>{getPemeriksaan(4)}</td>
+                        </tr>
+                        <tr>
+                            <td>Koordinat Lokasi</td>
+                            <td>:</td>
+                            <td>Lintang: {getPemeriksaan(5)} <br/> Bujur: {getPemeriksaan(6)}</td>
+                        </tr>
+                        <tr>
+                            <td className="font-semibold pt-2">Jenis Kegiatan Pemanfaatan Ruang</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2">{getPemeriksaan(7)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* 8. B. PENGUKURAN */}
+                <div className="font-bold mb-2 mt-4">B. Pengukuran (Opsional)</div>
+                <table className="layout-table mb-6 sub-table">
+                    <tbody>
+                        <tr>
+                            <td width="250" className="font-semibold">Luas Tanah</td>
+                            <td width="10">:</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Tanah yang digunakan</td>
+                            <td>:</td>
+                            <td>{getPengukuran(0)} m²</td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Tanah yang dikuasai</td>
+                            <td>:</td>
+                            <td>{getPengukuran(1)} m²</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">KDB</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2"></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Lantai Dasar Bangunan</td>
+                            <td>:</td>
+                            <td>{getPengukuran(2)} m²</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">KLB</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2"></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Jumlah Lantai Bangunan</td>
+                            <td>:</td>
+                            <td>{getPengukuran(3)} lantai</td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Seluruh Lantai Bangunan</td>
+                            <td>:</td>
+                            <td>{getPengukuran(4)} m²</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">Ketinggian Bangunan</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2">{getPengukuran(5)} m</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">KDH</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2"></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Tanah Bervegetasi</td>
+                            <td>:</td>
+                            <td>{getPengukuran(6)} m²</td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Tanah Perkerasan (resap air)</td>
+                            <td>:</td>
+                            <td>{getPengukuran(7)} m²</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">Koefisien Tapak Basemen</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2"></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Luas Basemen</td>
+                            <td>:</td>
+                            <td>{getPengukuran(8)} m²</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">Garis Sempadan Bangunan</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2"></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Jarak Dinding Terdepan - Pagar</td>
+                            <td>:</td>
+                            <td>{getPengukuran(9)} m</td>
+                        </tr>
+
+                        <tr>
+                            <td className="font-semibold pt-2">Jarak Bebas Bangunan</td>
+                            <td className="pt-2">:</td>
+                            <td className="pt-2"></td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Jarak Belakang</td>
+                            <td>:</td>
+                            <td>{getPengukuran(10)} m</td>
+                        </tr>
+                        <tr>
+                            <td className="pl-4">Jarak Samping</td>
+                            <td>:</td>
+                            <td>{getPengukuran(11)} m</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <p className="mb-8">
+                    Demikian Berita Acara ini dibuat dalam rangkap secukupnya untuk dipergunakan sebagaimana mestinya.
+                </p>
+
+                {/* 9. TANDA TANGAN GRID */}
+                <div className="grid grid-cols-2 gap-8 text-center text-sm page-break-inside-avoid">
+                    {/* Kiri: Pemegang */}
+                    <div>
+                        <p className="mb-4">Pemegang Pernyataan Mandiri Pelaku UMK/ Wakilnya</p>
+                        <div className="signature-image-container h-24 flex items-center justify-center">
+                            {manualData.tandaTanganPemegang && <img src={manualData.tandaTanganPemegang} alt="TTD" />}
                         </div>
-                        {data.koordinator && (
-                            <div className="signature-block">
-                                <p className="mb-2">Koordinator Lapangan</p>
-                                <div className="signature-image-container h-24 flex items-center justify-center">
-                                    {manualData.tandaTanganKoordinator && <img src={manualData.tandaTanganKoordinator} alt="TTD Koordinator" className="h-full object-contain" />}
-                                </div>
-                                <p className="font-bold underline mt-2">{manualData.namaKoordinatorTTD}</p>
-                                <p className="text-xs">NIP: {data.koordinator.nip}</p>
-                            </div>
-                        )}
+                        <p className="font-bold underline mt-2">{manualData.namaPemegangTTD}</p>
                     </div>
 
-                    {/* Row 2: Petugas Lapangan (Grid Dynamic) */}
-                    <div className="text-center font-bold mb-4 underline">Tim Penilai (Petugas Lapangan)</div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-center">
-                        {data.petugasLapangan.map((petugas, i) => (
-                            <div key={petugas.id} className="signature-block">
-                                <p className="text-sm mb-2">Petugas {i + 1}</p>
-                                <div className="signature-image-container h-20 flex items-center justify-center border-b border-gray-100 pb-1">
-                                    {teamSignatures[petugas.id] ? (
-                                        <img src={getSigUrl(teamSignatures[petugas.id])} alt={`TTD ${petugas.nama}`} className="h-full object-contain" crossOrigin="anonymous" />
-                                    ) : <span className="text-xs text-gray-400">Belum TTD</span>}
+                    {/* Kanan: Petugas Lapangan (Grid if many) */}
+                    <div>
+                        <div className="flex flex-col gap-6">
+                            {data.petugasLapangan.map((petugas, i) => (
+                                <div key={petugas.id}>
+                                    <p className="mb-2">Petugas Lapangan {i + 1}</p>
+                                    <div className="signature-image-container h-20 flex items-center justify-center">
+                                        {teamSignatures[petugas.id] ? (
+                                            <img src={getSigUrl(teamSignatures[petugas.id])} alt="TTD" crossOrigin="anonymous" />
+                                        ) : <span>(Belum TTD)</span>}
+                                    </div>
+                                    <p className="font-bold underline">{petugas.nama}</p>
+                                    <p>NIP: {petugas.nip || '-'}</p>
                                 </div>
-                                <p className="font-bold text-sm mt-1">{petugas.nama}</p>
-                                <p className="text-xs text-gray-500">NIP: {petugas.nip || '-'}</p>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
+
+                {/* Bawah Tengah: Koordinator */}
+                {data.koordinator && (
+                    <div className="text-center mt-10 page-break-inside-avoid">
+                        <p className="mb-4">Koordinator Lapangan</p>
+                        <div className="signature-image-container h-24 flex items-center justify-center">
+                            {manualData.tandaTanganKoordinator && <img src={manualData.tandaTanganKoordinator} alt="TTD" />}
+                        </div>
+                        <p className="font-bold underline mt-2">{manualData.namaKoordinatorTTD}</p>
+                        <p>NIP: {data.koordinator.nip || '-'}</p>
+                    </div>
+                )}
             </div>
         </div>
     );
