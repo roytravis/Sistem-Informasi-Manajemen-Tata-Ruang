@@ -351,7 +351,38 @@ export default function FormulirAnalisisPage() {
 
     const timPenilai = useMemo(() => kasus?.tim?.users || [], [kasus]);
 
-    // 3. Handlers
+    // 3. FITUR: AUTO-CALCULATE KDB
+    useEffect(() => {
+        const luasLantaiStr = dataPrefill.kdb_luas_lantai_dasar;
+        const luasTanahStr = dataPrefill.luas_dikuasai;
+
+        if (luasLantaiStr && luasTanahStr) {
+            // Konversi ke float (aman untuk string '1000' atau '1000.50')
+            const luasLantai = parseFloat(String(luasLantaiStr).replace(',', '.'));
+            const luasTanah = parseFloat(String(luasTanahStr).replace(',', '.'));
+
+            if (!isNaN(luasLantai) && !isNaN(luasTanah) && luasTanah > 0) {
+                // Hitung Rasio dan Persentase
+                const rasioVal = luasLantai / luasTanah;
+                const rasioFixed = rasioVal.toFixed(3); // 3 desimal untuk presisi rasio
+                const persenFixed = (rasioVal * 100).toFixed(2); // 2 desimal untuk persen
+
+                setFormData(prev => {
+                    // Cek apakah nilai berubah agar tidak loop
+                    if (prev.kdb_luas_lantai_dasar_rasio === rasioFixed && prev.kdb_perbandingan_manual === persenFixed) {
+                        return prev;
+                    }
+                    return {
+                        ...prev,
+                        kdb_luas_lantai_dasar_rasio: rasioFixed,
+                        kdb_perbandingan_manual: persenFixed
+                    };
+                });
+            }
+        }
+    }, [dataPrefill.kdb_luas_lantai_dasar, dataPrefill.luas_dikuasai]);
+
+    // 4. Handlers
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -421,7 +452,7 @@ export default function FormulirAnalisisPage() {
         }
     };
 
-    // 4. Render Helper
+    // 5. Render Helper
     const renderEditButton = () => {
         if (!dataExists) return null;
         const status = editRequest?.status;
