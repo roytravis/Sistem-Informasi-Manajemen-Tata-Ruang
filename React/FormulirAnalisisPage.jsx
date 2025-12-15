@@ -205,9 +205,7 @@ export default function FormulirAnalisisPage() {
         jenis_ketentuan_rtr: '',
         jenis_kesesuaian_rtr: 'Sesuai',
         luas_digunakan_ketentuan_rtr: '',
-        luas_digunakan_kesesuaian_rtr: 'Sesuai',
         luas_dikuasai_ketentuan_rtr: '',
-        luas_dikuasai_kesesuaian_rtr: 'Sesuai',
         luas_tanah_kesesuaian_rtr: 'Sesuai', 
         kdb_ketentuan_rtr: '',
         kdb_kesesuaian_rtr: 'Sesuai',
@@ -384,39 +382,7 @@ export default function FormulirAnalisisPage() {
         }
     }, [dataPrefill.kdb_luas_lantai_dasar, dataPrefill.luas_dikuasai]);
 
-    // 4. FITUR: AUTO-CALCULATE KLB (Baru)
-    useEffect(() => {
-        const luasSeluruhLantaiStr = dataPrefill.klb_luas_seluruh_lantai; // Data dari survey
-        const luasTanahKLBStr = formData.klb_luas_tanah; // Input manual user
-
-        if (luasSeluruhLantaiStr && luasTanahKLBStr) {
-            // Bersihkan string dan konversi ke float
-            const luasLantai = parseFloat(String(luasSeluruhLantaiStr).replace(',', '.'));
-            const luasTanah = parseFloat(String(luasTanahKLBStr).replace(',', '.'));
-
-            if (!isNaN(luasLantai) && !isNaN(luasTanah) && luasTanah > 0) {
-                // Rasio KLB = Luas Seluruh Lantai Bangunan / Luas Tanah
-                const rasioVal = luasLantai / luasTanah;
-                const rasioFixed = rasioVal.toFixed(3); // 3 desimal untuk konsistensi
-
-                setFormData(prev => {
-                    if (prev.klb_luas_seluruh_lantai_rasio === rasioFixed) return prev;
-                    return {
-                        ...prev,
-                        klb_luas_seluruh_lantai_rasio: rasioFixed
-                    };
-                });
-            } else {
-                 // Reset jika input tidak valid
-                 setFormData(prev => {
-                    if (prev.klb_luas_seluruh_lantai_rasio === '') return prev;
-                    return { ...prev, klb_luas_seluruh_lantai_rasio: '' };
-                });
-            }
-        }
-    }, [dataPrefill.klb_luas_seluruh_lantai, formData.klb_luas_tanah]);
-
-    // 5. Handlers
+    // 4. Handlers
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -486,7 +452,7 @@ export default function FormulirAnalisisPage() {
         }
     };
 
-    // 6. Render Helper
+    // 5. Render Helper
     const renderEditButton = () => {
         if (!dataExists) return null;
         const status = editRequest?.status;
