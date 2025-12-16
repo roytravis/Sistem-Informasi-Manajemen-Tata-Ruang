@@ -193,11 +193,21 @@ export default function PenilaianPage() {
                                         const sudahDinilai = p.kasus && p.kasus.penilaian && !isDraft;
                                         
                                         const isSelesaiDinilai = sudahDinilai && (p.kasus.status.toLowerCase().includes('selesai') || p.kasus.status === 'Menunggu Verifikasi');
-                                        const baPemeriksaanDibuat = p.kasus?.penilaian?.ba_pemeriksaan;
-                                        const formulirAnalisisDibuat = p.kasus?.penilaian?.formulir_analisis;
                                         
-                                        const showAnalisisButton = isSelesaiDinilai && baPemeriksaanDibuat;
-                                        const showBaHasilButton = isSelesaiDinilai && formulirAnalisisDibuat; 
+                                        // PERBAIKAN LOGIKA DISINI: Gunakan pengecekan yang aman (safe navigation)
+                                        const penilaian = p.kasus?.penilaian;
+                                        // Dukung snake_case (standar JSON) dan camelCase (jika ada serialisasi default)
+                                        const baPemeriksaanDibuat = penilaian?.ba_pemeriksaan || penilaian?.baPemeriksaan;
+                                        const formulirAnalisisDibuat = penilaian?.formulir_analisis || penilaian?.formulirAnalisis;
+                                        
+                                        // REVISI LOGIKA TAMPILAN:
+                                        // Tombol 'Analisis' muncul jika BA Pemeriksaan (Lapangan) sudah ada
+                                        const showAnalisisButton = sudahDinilai && baPemeriksaanDibuat;
+                                        
+                                        // PERBAIKAN UTAMA:
+                                        // Tombol 'BA Hasil' muncul jika Formulir Analisis sudah disimpan (datanya ada)
+                                        // Kita hapus syarat 'isSelesaiDinilai' agar tombol tetap muncul meskipun status teks belum update
+                                        const showBaHasilButton = sudahDinilai && formulirAnalisisDibuat; 
 
                                         // --- LOGIKA BARU: Cek Status Edit Request ---
                                         const editRequest = p.kasus?.penilaian?.latest_edit_request;
