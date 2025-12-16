@@ -17,12 +17,12 @@ class PermohonanPenilaianController extends Controller
     public function index(Request $request)
     {
         // Eager load relasi
-        // PERUBAHAN: Menambahkan 'kasus.penilaian.latestEditRequest' agar status edit muncul di dashboard
+        // PERUBAHAN: Memastikan 'kasus.penilaian.formulirAnalisis' dimuat untuk pengecekan tombol BA Hasil
         $query = PermohonanPenilaian::with([
             'pemegang', 
             'kasus.penilaian.baPemeriksaan',
-            'kasus.penilaian.formulirAnalisis',
-            'kasus.penilaian.latestEditRequest', // <-- DITAMBAHKAN
+            'kasus.penilaian.formulirAnalisis', // <-- PENTING: Relasi ini harus ada
+            'kasus.penilaian.latestEditRequest',
             'beritaAcara'
         ]);
 
