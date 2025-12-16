@@ -224,11 +224,11 @@ export default function FormulirAnalisisPage() {
         kdh_perbandingan_manual: '',
         kdh_ketentuan_rtr: '',
         kdh_kesesuaian_rtr: 'Sesuai',
-        ktb_luas_tanah: '',
+        ktb_luas_tanah: '', // Input Manual Luas Tanah untuk KTB
         ktb_ketentuan_rtr: '',
         ktb_kesesuaian_rtr: 'Sesuai',
-        ktb_luas_basemen_rasio: '',
-        ktb_perbandingan_manual: '',
+        ktb_luas_basemen_rasio: '', // Auto-calculate
+        ktb_perbandingan_manual: '', // Auto-calculate %
         gsb_ketentuan_rtr: '',
         gsb_kesesuaian_rtr: 'Sesuai',
         jbb_ketentuan_rtr: '',
@@ -344,7 +344,7 @@ export default function FormulirAnalisisPage() {
             klb_ketinggian: png[5]?.hasil_pengukuran,
             kdh_vegetasi: png[6]?.hasil_pengukuran,
             kdh_perkerasan: png[7]?.hasil_pengukuran,
-            ktb_luas_basemen: png[8]?.hasil_pengukuran,
+            ktb_luas_basemen: png[8]?.hasil_pengukuran, // Mengambil Luas Basement dari data survei
             gsb_jarak: png[9]?.hasil_pengukuran,
             jbb_belakang: png[10]?.hasil_pengukuran,
             jbb_samping: png[11]?.hasil_pengukuran,
@@ -416,7 +416,41 @@ export default function FormulirAnalisisPage() {
         }
     }, [dataPrefill.klb_luas_seluruh_lantai, formData.klb_luas_tanah]);
 
-    // 5. Handlers
+    // 5. FITUR: AUTO-CALCULATE KTB (Koefisien Tapak Basement)
+    useEffect(() => {
+        const luasBasemenStr = dataPrefill.ktb_luas_basemen; // Dari Survei
+        const luasTanahKTBStr = formData.ktb_luas_tanah; // Input Manual atau Reuse
+
+        if (luasBasemenStr && luasTanahKTBStr) {
+            const luasBasemen = parseFloat(String(luasBasemenStr).replace(',', '.'));
+            const luasTanah = parseFloat(String(luasTanahKTBStr).replace(',', '.'));
+
+            if (!isNaN(luasBasemen) && !isNaN(luasTanah) && luasTanah > 0) {
+                // KTB = Luas Basement / Luas Tanah
+                const rasioVal = luasBasemen / luasTanah;
+                const rasioFixed = rasioVal.toFixed(3);
+                const persenFixed = (rasioVal * 100).toFixed(2);
+
+                setFormData(prev => {
+                    if (prev.ktb_luas_basemen_rasio === rasioFixed && prev.ktb_perbandingan_manual === persenFixed) {
+                        return prev;
+                    }
+                    return {
+                        ...prev,
+                        ktb_luas_basemen_rasio: rasioFixed,
+                        ktb_perbandingan_manual: persenFixed
+                    };
+                });
+            } else {
+                setFormData(prev => {
+                    if (prev.ktb_luas_basemen_rasio === '' && prev.ktb_perbandingan_manual === '') return prev;
+                    return { ...prev, ktb_luas_basemen_rasio: '', ktb_perbandingan_manual: '' };
+                });
+            }
+        }
+    }, [dataPrefill.ktb_luas_basemen, formData.ktb_luas_tanah]);
+
+    // 6. Handlers
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -486,7 +520,7 @@ export default function FormulirAnalisisPage() {
         }
     };
 
-    // 6. Render Helper
+    // 7. Render Helper
     const renderEditButton = () => {
         if (!dataExists) return null;
         const status = editRequest?.status;
@@ -660,11 +694,42 @@ export default function FormulirAnalisisPage() {
                                     <tr><TableCell colSpan={5} className={blockHeaderClass}>Ketinggian Bangunan</TableCell></tr>
                                     <tr>
                                         <TableCell className="font-semibold pl-4">Tinggi</TableCell>
-                                        <TableCell className="pl-8">Tinggi Bangunan</TableCell>
+                                        <TableCell className="pl-8">Ketinggian Bangunan</TableCell>
+                                        {/* Menggunakan data Ketinggian Bangunan yang sudah tersedia dari survei */}
                                         <TableCell><InputWithUnit unit="m"><ReadOnlyInput value={dataPrefill.klb_ketinggian} /></InputWithUnit></TableCell>
                                         <TableCell><InputWithUnit unit="m"><ManualInput name="ketinggian_ketentuan_rtr" value={formData.ketinggian_ketentuan_rtr} onChange={handleChange} disabled={isReadOnly} /></InputWithUnit></TableCell>
                                         <TableCell><SelectInput name="ketinggian_kesesuaian_rtr" value={formData.ketinggian_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput></TableCell>
                                     </tr>
+
+                                    {/* KDH */}
+                                    <tr><TableCell colSpan={5} className={blockHeaderClass}>KDH</TableCell></tr>
+                                    <tr>
+                                        <TableCell className="font-semibold pl-4" rowSpan={4}>KDH</TableCell>
+                                        <TableCell className="pl-8">Luas Tanah Vegetasi</TableCell>
+                                        <TableCell><InputWithUnit unit="m²"><ReadOnlyInput value={dataPrefill.kdh_vegetasi} /></InputWithUnit></TableCell>
+                                        <TableCell rowSpan={4}><InputWithUnit unit="%"><ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} disabled={isReadOnly} /></InputWithUnit></TableCell>
+                                        <TableCell rowSpan={4}><SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput></TableCell>
+                                    </tr>
+                                    <tr><TableCell className="pl-8">Luas Perkerasan</TableCell><TableCell><InputWithUnit unit="m²"><ReadOnlyInput value={dataPrefill.kdh_perkerasan} /></InputWithUnit></TableCell></tr>
+                                    <tr><TableCell className="pl-8">Luas Tanah</TableCell><TableCell><InputWithUnit unit="m²"><ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} disabled={isReadOnly} placeholder="Input Luas Tanah" /></InputWithUnit></TableCell></tr>
+                                    <tr><TableCell className="pl-8">Persentase</TableCell><TableCell><InputWithUnit unit="%"><ReadOnlyInput value={formData.kdh_perbandingan_manual} /></InputWithUnit></TableCell></tr>
+
+                                    {/* KTB (Koefisien Tapak Basement) - BARU */}
+                                    <tr><TableCell colSpan={5} className={blockHeaderClass}>KTB (Koefisien Tapak Basemen)</TableCell></tr>
+                                    <tr>
+                                        <TableCell className="font-semibold pl-4" rowSpan={4}>KTB</TableCell>
+                                        <TableCell className="pl-8">Luas Basemen</TableCell>
+                                        {/* Data Luas Basement diambil dari survei */}
+                                        <TableCell><InputWithUnit unit="m²"><ReadOnlyInput value={dataPrefill.ktb_luas_basemen} /></InputWithUnit></TableCell>
+                                        <TableCell rowSpan={4}><InputWithUnit unit="%"><ManualInput name="ktb_ketentuan_rtr" value={formData.ktb_ketentuan_rtr} onChange={handleChange} disabled={isReadOnly} /></InputWithUnit></TableCell>
+                                        <TableCell rowSpan={4}><SelectInput name="ktb_kesesuaian_rtr" value={formData.ktb_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput></TableCell>
+                                    </tr>
+                                    <tr>
+                                        <TableCell className="pl-8">Luas Tanah</TableCell>
+                                        <TableCell><InputWithUnit unit="m²"><ManualInput name="ktb_luas_tanah" value={formData.ktb_luas_tanah} onChange={handleChange} disabled={isReadOnly} placeholder="Input Luas Tanah" /></InputWithUnit></TableCell>
+                                    </tr>
+                                    <tr><TableCell className="pl-8 italic">Rasio</TableCell><TableCell><ReadOnlyInput value={formData.ktb_luas_basemen_rasio} /></TableCell></tr>
+                                    <tr><TableCell className="pl-8">Persentase</TableCell><TableCell><InputWithUnit unit="%"><ReadOnlyInput value={formData.ktb_perbandingan_manual} /></InputWithUnit></TableCell></tr>
 
                                     {/* GSB & JBB */}
                                     <tr><TableCell colSpan={5} className={blockHeaderClass}>GSB & JBB</TableCell></tr>
