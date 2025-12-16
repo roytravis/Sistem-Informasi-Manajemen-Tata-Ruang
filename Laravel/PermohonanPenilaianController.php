@@ -16,18 +16,25 @@ class PermohonanPenilaianController extends Controller
 {
     public function index(Request $request)
     {
-        // Eager load relasi
-        // PERUBAHAN: Memastikan 'kasus.penilaian.formulirAnalisis' dimuat untuk pengecekan tombol BA Hasil
+        // PERBAIKAN: Menggunakan Closure untuk Eager Loading Nested Relations
+        // Ini lebih aman daripada notasi titik ('kasus.penilaian.formulirAnalisis')
+        // karena memastikan sub-relasi dimuat dalam konteks model Penilaian.
         $query = PermohonanPenilaian::with([
             'pemegang', 
-            'kasus.penilaian.baPemeriksaan',
-            'kasus.penilaian.formulirAnalisis', // <-- PENTING: Relasi ini harus ada
-            'kasus.penilaian.latestEditRequest',
-            'beritaAcara'
+            'beritaAcara',
+            'kasus' => function ($q) {
+                // Memuat relasi nested di dalam Kasus -> Penilaian
+                $q->with(['penilaian' => function ($qPenilaian) {
+                    $qPenilaian->with([
+                        'baPemeriksaan',
+                        'formulirAnalisis', // <-- Target Utama Perbaikan
+                        'latestEditRequest'
+                    ]);
+                }]);
+            }
         ]);
 
         // LOGIKA BARU: Filter berdasarkan ID spesifik (dari Notifikasi)
-        // Jika ada parameter 'id', kita cari spesifik dan abaikan filter status 'pending'
         if ($request->has('id')) {
             $query->where('id', $request->query('id'));
         } else {

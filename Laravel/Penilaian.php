@@ -26,6 +26,17 @@ class Penilaian extends Model
         'tanda_tangan_tim' => 'array',
     ];
 
+    // --- DEBUGGING & FIX: Append status keberadaan formulir ---
+    // Menambahkan atribut 'has_formulir_analisis' ke dalam JSON output otomatis
+    protected $appends = ['has_formulir_analisis'];
+
+    // Accessor untuk mengecek langsung ke DB apakah relasi ada
+    public function getHasFormulirAnalisisAttribute()
+    {
+        return $this->formulirAnalisis()->exists();
+    }
+    // ----------------------------------------------------------
+
     public function kasus()
     {
         return $this->belongsTo(Kasus::class);
@@ -46,18 +57,11 @@ class Penilaian extends Model
         return $this->hasOne(BaHasilPenilaian::class);
     }
 
-    /**
-     * Relasi ke semua Edit Request.
-     */
     public function editRequests()
     {
         return $this->hasMany(EditRequest::class);
     }
 
-    /**
-     * Helper untuk mengambil request edit terakhir (Latest of Many).
-     * Fitur ini memudahkan pengambilan status terkini tanpa looping manual.
-     */
     public function latestEditRequest()
     {
         return $this->hasOne(EditRequest::class)->latestOfMany();
