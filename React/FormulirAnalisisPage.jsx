@@ -450,7 +450,50 @@ export default function FormulirAnalisisPage() {
         }
     }, [dataPrefill.ktb_luas_basemen, formData.ktb_luas_tanah]);
 
-    // 6. Handlers
+    // 6. FITUR: AUTO-CALCULATE KDH (Koefisien Daerah Hijau)
+    useEffect(() => {
+        const luasVegetasiStr = dataPrefill.kdh_vegetasi; // Dari Survei (Luas Tanah Bervegetasi)
+        const luasPerkerasanStr = dataPrefill.kdh_perkerasan; // Dari Survei (Luas Tanah Perkerasan)
+        const luasTanahKDHStr = formData.kdh_luas_tanah; // Input Manual
+
+        if (luasVegetasiStr && luasTanahKDHStr) {
+            const luasVegetasi = parseFloat(String(luasVegetasiStr).replace(',', '.'));
+            const luasPerkerasan = parseFloat(String(luasPerkerasanStr || '0').replace(',', '.')); // Optional, default 0
+            const luasTanah = parseFloat(String(luasTanahKDHStr).replace(',', '.'));
+
+            if (!isNaN(luasVegetasi) && !isNaN(luasTanah) && luasTanah > 0) {
+                // 1. Hitung Rasio KDH
+                // Rumus: (Luas Tanah Vegetasi + Luas Tanah Perkerasan) / Luas Tanah
+                const rasioVal = (luasVegetasi + (isNaN(luasPerkerasan) ? 0 : luasPerkerasan)) / luasTanah;
+                const rasioFixed = rasioVal.toFixed(3);
+
+                // 2. Hitung Persentase KDH
+                // Rumus: (Luas Tanah Vegetasi / Luas Tanah) * 100%
+                const persenVal = (luasVegetasi / luasTanah) * 100;
+                const persenFixed = persenVal.toFixed(2);
+
+                setFormData(prev => {
+                    // Prevent infinite loop if values are same
+                    if (prev.kdh_rasio_manual === rasioFixed && prev.kdh_perbandingan_manual === persenFixed) {
+                        return prev;
+                    }
+                    return {
+                        ...prev,
+                        kdh_rasio_manual: rasioFixed,
+                        kdh_perbandingan_manual: persenFixed
+                    };
+                });
+            } else {
+                // Reset jika input invalid
+                setFormData(prev => {
+                    if (prev.kdh_rasio_manual === '' && prev.kdh_perbandingan_manual === '') return prev;
+                    return { ...prev, kdh_rasio_manual: '', kdh_perbandingan_manual: '' };
+                });
+            }
+        }
+    }, [dataPrefill.kdh_vegetasi, dataPrefill.kdh_perkerasan, formData.kdh_luas_tanah]);
+
+    // 7. Handlers
     const handleChange = useCallback((e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -520,7 +563,7 @@ export default function FormulirAnalisisPage() {
         }
     };
 
-    // 7. Render Helper
+    // 8. Render Helper
     const renderEditButton = () => {
         if (!dataExists) return null;
         const status = editRequest?.status;
@@ -704,14 +747,15 @@ export default function FormulirAnalisisPage() {
                                     {/* KDH */}
                                     <tr><TableCell colSpan={5} className={blockHeaderClass}>KDH</TableCell></tr>
                                     <tr>
-                                        <TableCell className="font-semibold pl-4" rowSpan={4}>KDH</TableCell>
+                                        <TableCell className="font-semibold pl-4" rowSpan={5}>KDH</TableCell>
                                         <TableCell className="pl-8">Luas Tanah Vegetasi</TableCell>
                                         <TableCell><InputWithUnit unit="m²"><ReadOnlyInput value={dataPrefill.kdh_vegetasi} /></InputWithUnit></TableCell>
-                                        <TableCell rowSpan={4}><InputWithUnit unit="%"><ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} disabled={isReadOnly} /></InputWithUnit></TableCell>
-                                        <TableCell rowSpan={4}><SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput></TableCell>
+                                        <TableCell rowSpan={5}><InputWithUnit unit="%"><ManualInput name="kdh_ketentuan_rtr" value={formData.kdh_ketentuan_rtr} onChange={handleChange} disabled={isReadOnly} /></InputWithUnit></TableCell>
+                                        <TableCell rowSpan={5}><SelectInput name="kdh_kesesuaian_rtr" value={formData.kdh_kesesuaian_rtr} onChange={handleChange} disabled={isReadOnly}>{dropdownSesuai}</SelectInput></TableCell>
                                     </tr>
                                     <tr><TableCell className="pl-8">Luas Perkerasan</TableCell><TableCell><InputWithUnit unit="m²"><ReadOnlyInput value={dataPrefill.kdh_perkerasan} /></InputWithUnit></TableCell></tr>
                                     <tr><TableCell className="pl-8">Luas Tanah</TableCell><TableCell><InputWithUnit unit="m²"><ManualInput name="kdh_luas_tanah" value={formData.kdh_luas_tanah} onChange={handleChange} disabled={isReadOnly} placeholder="Input Luas Tanah" /></InputWithUnit></TableCell></tr>
+                                    <tr><TableCell className="pl-8 italic">Rasio</TableCell><TableCell><ReadOnlyInput value={formData.kdh_rasio_manual} /></TableCell></tr>
                                     <tr><TableCell className="pl-8">Persentase</TableCell><TableCell><InputWithUnit unit="%"><ReadOnlyInput value={formData.kdh_perbandingan_manual} /></InputWithUnit></TableCell></tr>
 
                                     {/* KTB (Koefisien Tapak Basement) - BARU */}
