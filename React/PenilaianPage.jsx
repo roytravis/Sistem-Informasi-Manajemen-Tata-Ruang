@@ -57,6 +57,16 @@ export default function PenilaianPage() {
             }
 
             const response = await api.get(url);
+            
+            // --- DEBUGGING LOG ---
+            console.log("Data Permohonan Penilaian:", response.data.data);
+            response.data.data.forEach(item => {
+                if (item.kasus?.penilaian) {
+                    console.log(`ID: ${item.id}, Formulir Analisis:`, item.kasus.penilaian.formulir_analisis || item.kasus.penilaian.formulirAnalisis);
+                }
+            });
+            // ---------------------
+
             setPmpList(response.data.data);
             setPagination({
                 current_page: response.data.current_page,
@@ -190,27 +200,24 @@ export default function PenilaianPage() {
                                     {pmpList.length > 0 ? pmpList.map(p => {
                                         const tidakTerlaksana = p.status === 'Penilaian Tidak Terlaksana' && p.berita_acara_id;
                                         const isDraft = p.status === 'Draft';
-                                        const sudahDinilai = p.kasus && p.kasus.penilaian && !isDraft;
                                         
-                                        const isSelesaiDinilai = sudahDinilai && (p.kasus.status.toLowerCase().includes('selesai') || p.kasus.status === 'Menunggu Verifikasi');
-                                        
-                                        // PERBAIKAN LOGIKA DISINI: Gunakan pengecekan yang aman (safe navigation)
+                                        // Pengecekan Penilaian
                                         const penilaian = p.kasus?.penilaian;
-                                        // Dukung snake_case (standar JSON) dan camelCase (jika ada serialisasi default)
-                                        const baPemeriksaanDibuat = penilaian?.ba_pemeriksaan || penilaian?.baPemeriksaan;
-                                        const formulirAnalisisDibuat = penilaian?.formulir_analisis || penilaian?.formulirAnalisis;
+                                        const sudahDinilai = penilaian && !isDraft;
                                         
-                                        // REVISI LOGIKA TAMPILAN:
-                                        // Tombol 'Analisis' muncul jika BA Pemeriksaan (Lapangan) sudah ada
-                                        const showAnalisisButton = sudahDinilai && baPemeriksaanDibuat;
+                                        // Cek ketersediaan dokumen (Safe Navigation & Snake/Camel Case Support)
+                                        const baPemeriksaanDibuat = penilaian && (penilaian.ba_pemeriksaan || penilaian.baPemeriksaan);
+                                        const formulirAnalisisDibuat = penilaian && (penilaian.formulir_analisis || penilaian.formulirAnalisis);
                                         
-                                        // PERBAIKAN UTAMA:
-                                        // Tombol 'BA Hasil' muncul jika Formulir Analisis sudah disimpan (datanya ada)
-                                        // Kita hapus syarat 'isSelesaiDinilai' agar tombol tetap muncul meskipun status teks belum update
-                                        const showBaHasilButton = sudahDinilai && formulirAnalisisDibuat; 
+                                        // REVISI LOGIKA TAMPILAN TOMBOL:
+                                        // 1. Tombol 'Analisis' muncul jika Penilaian ada DAN BA Pemeriksaan (Lapangan) sudah dibuat
+                                        const showAnalisisButton = penilaian && baPemeriksaanDibuat;
+                                        
+                                        // 2. Tombol 'BA Hasil' muncul jika Penilaian ada DAN Formulir Analisis sudah disimpan
+                                        const showBaHasilButton = penilaian && formulirAnalisisDibuat; 
 
                                         // --- LOGIKA BARU: Cek Status Edit Request ---
-                                        const editRequest = p.kasus?.penilaian?.latest_edit_request;
+                                        const editRequest = penilaian?.latest_edit_request;
                                         const isEditMode = editRequest && editRequest.status === 'approved';
                                         // --------------------------------------------
 
