@@ -58,14 +58,25 @@ export default function PenilaianPage() {
 
             const response = await api.get(url);
             
-            // --- DEBUGGING LOG ---
-            console.log("Data Permohonan Penilaian:", response.data.data);
-            response.data.data.forEach(item => {
-                if (item.kasus?.penilaian) {
-                    console.log(`ID: ${item.id}, Formulir Analisis:`, item.kasus.penilaian.formulir_analisis || item.kasus.penilaian.formulirAnalisis);
+            // --- DEBUGGING LOG (UPDATED) ---
+            console.group("DEBUGGING DATA PENILAIAN");
+            response.data.data.forEach((item, index) => {
+                const pen = item.kasus?.penilaian;
+                if (pen) {
+                    console.log(`Item #${index} (ID: ${item.id}) - Penilaian ID: ${pen.id}`);
+                    // Mencetak keys dengan JSON.stringify agar terlihat jelas
+                    console.log(`Keys:`, JSON.stringify(Object.keys(pen)));
+                    // Mencetak nilai check DB langsung
+                    console.log(`Has Formulir Analisis (DB Check):`, pen.has_formulir_analisis);
+                    
+                    const fa = pen.formulir_analisis || pen.formulirAnalisis;
+                    console.log(`Object Formulir Analisis:`, fa ? "Loaded" : "Null/Undefined");
+                } else {
+                    console.log(`Item #${index} (ID: ${item.id}) - Belum ada Penilaian`);
                 }
             });
-            // ---------------------
+            console.groupEnd();
+            // -------------------------------
 
             setPmpList(response.data.data);
             setPagination({
@@ -206,8 +217,16 @@ export default function PenilaianPage() {
                                         const sudahDinilai = penilaian && !isDraft;
                                         
                                         // Cek ketersediaan dokumen (Safe Navigation & Snake/Camel Case Support)
+                                        // Gunakan logika yang sama dengan debugging untuk konsistensi
                                         const baPemeriksaanDibuat = penilaian && (penilaian.ba_pemeriksaan || penilaian.baPemeriksaan);
-                                        const formulirAnalisisDibuat = penilaian && (penilaian.formulir_analisis || penilaian.formulirAnalisis);
+                                        
+                                        // PERBAIKAN: Cek flag dari DB (has_formulir_analisis) sebagai prioritas utama
+                                        // Ini mengatasi masalah jika eager loading object mengembalikan null
+                                        const formulirAnalisisDibuat = penilaian && (
+                                            penilaian.has_formulir_analisis === true || // Check DB flag first
+                                            !!penilaian.formulir_analisis || 
+                                            !!penilaian.formulirAnalisis
+                                        );
                                         
                                         // REVISI LOGIKA TAMPILAN TOMBOL:
                                         // 1. Tombol 'Analisis' muncul jika Penilaian ada DAN BA Pemeriksaan (Lapangan) sudah dibuat
@@ -217,7 +236,7 @@ export default function PenilaianPage() {
                                         const showBaHasilButton = penilaian && formulirAnalisisDibuat; 
 
                                         // --- LOGIKA BARU: Cek Status Edit Request ---
-                                        const editRequest = penilaian?.latest_edit_request;
+                                        const editRequest = penilaian?.latest_edit_request || penilaian?.latestEditRequest;
                                         const isEditMode = editRequest && editRequest.status === 'approved';
                                         // --------------------------------------------
 
