@@ -31,8 +31,16 @@ class Penilaian extends Model
     protected $appends = ['has_formulir_analisis'];
 
     // Accessor untuk mengecek langsung ke DB apakah relasi ada
+    // PERBAIKAN: Menggunakan relationLoaded untuk efisiensi dan akurasi
     public function getHasFormulirAnalisisAttribute()
     {
+        // Jika relasi sudah di-load oleh controller (eager loading), gunakan datanya langsung
+        // Ini mencegah query N+1 dan memastikan data konsisten dengan apa yang diambil controller
+        if ($this->relationLoaded('formulirAnalisis')) {
+            return $this->formulirAnalisis !== null;
+        }
+        
+        // Jika belum di-load (fallback), baru lakukan query ke database
         return $this->formulirAnalisis()->exists();
     }
     // ----------------------------------------------------------

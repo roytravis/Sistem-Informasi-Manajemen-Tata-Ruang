@@ -19,6 +19,7 @@ class PermohonanPenilaianController extends Controller
         // PERBAIKAN: Menggunakan Closure untuk Eager Loading Nested Relations
         // Ini lebih aman daripada notasi titik ('kasus.penilaian.formulirAnalisis')
         // karena memastikan sub-relasi dimuat dalam konteks model Penilaian.
+        // Hal ini penting agar 'has_formulir_analisis' di model Penilaian bisa mendeteksi data yang sudah di-load.
         $query = PermohonanPenilaian::with([
             'pemegang', 
             'beritaAcara',
@@ -27,7 +28,7 @@ class PermohonanPenilaianController extends Controller
                 $q->with(['penilaian' => function ($qPenilaian) {
                     $qPenilaian->with([
                         'baPemeriksaan',
-                        'formulirAnalisis', // <-- Target Utama Perbaikan
+                        'formulirAnalisis', // <-- Target Utama Perbaikan: Pastikan relasi ini dimuat
                         'latestEditRequest'
                     ]);
                 }]);
