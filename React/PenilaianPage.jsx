@@ -59,18 +59,14 @@ export default function PenilaianPage() {
             const response = await api.get(url);
             
             // --- DEBUGGING LOG (UPDATED) ---
-            console.group("DEBUGGING DATA PENILAIAN");
+            console.group("DEBUGGING DATA PENILAIAN (FETCH)");
             response.data.data.forEach((item, index) => {
                 const pen = item.kasus?.penilaian;
                 if (pen) {
-                    console.log(`Item #${index} (ID: ${item.id}) - Penilaian ID: ${pen.id}`);
-                    // Mencetak keys dengan JSON.stringify agar terlihat jelas
-                    console.log(`Keys:`, JSON.stringify(Object.keys(pen)));
-                    // Mencetak nilai check DB langsung
-                    console.log(`Has Formulir Analisis (DB Check):`, pen.has_formulir_analisis);
-                    
-                    const fa = pen.formulir_analisis || pen.formulirAnalisis;
-                    console.log(`Object Formulir Analisis:`, fa ? "Loaded" : "Null/Undefined");
+                    console.log(`Item #${index} (ID: ${item.id})`);
+                    console.log(`- Penilaian ID:`, pen.id);
+                    console.log(`- Kasus ID:`, item.kasus.id); // Tambahan Log Kasus ID
+                    console.log(`- has_formulir_analisis (Raw):`, pen.has_formulir_analisis);
                 } else {
                     console.log(`Item #${index} (ID: ${item.id}) - Belum ada Penilaian`);
                 }
@@ -216,39 +212,29 @@ export default function PenilaianPage() {
                                         const penilaian = p.kasus?.penilaian;
                                         const sudahDinilai = penilaian && !isDraft;
                                         
-                                        // Cek ketersediaan dokumen (Safe Navigation & Snake/Camel Case Support)
-                                        // Gunakan logika yang sama dengan debugging untuk konsistensi
+                                        // Cek ketersediaan dokumen
                                         const baPemeriksaanDibuat = penilaian && (penilaian.ba_pemeriksaan || penilaian.baPemeriksaan);
                                         
-                                        // PERBAIKAN: Cek flag dari DB (has_formulir_analisis) sebagai prioritas utama
-                                        // Ini mengatasi masalah jika eager loading object mengembalikan null
-                                        const formulirAnalisisDibuat = penilaian && (
-                                            penilaian.has_formulir_analisis === true || // Check DB flag first
-                                            !!penilaian.formulir_analisis || 
-                                            !!penilaian.formulirAnalisis
-                                        );
+                                        // Deteksi Formulir Analisis
+                                        const hasFlag = !!penilaian?.has_formulir_analisis;
+                                        const hasObjSnake = !!penilaian?.formulir_analisis;
+                                        const hasObjCamel = !!penilaian?.formulirAnalisis;
+                                        const formulirAnalisisDibuat = penilaian && (hasFlag || hasObjSnake || hasObjCamel);
                                         
-                                        // REVISI LOGIKA TAMPILAN TOMBOL:
-                                        // 1. Tombol 'Analisis' muncul jika Penilaian ada DAN BA Pemeriksaan (Lapangan) sudah dibuat
+                                        // LOGIKA TOMBOL:
                                         const showAnalisisButton = penilaian && baPemeriksaanDibuat;
-                                        
-                                        // 2. Tombol 'BA Hasil' muncul jika Penilaian ada DAN Formulir Analisis sudah disimpan
                                         const showBaHasilButton = penilaian && formulirAnalisisDibuat; 
 
-                                        // --- LOGIKA BARU: Cek Status Edit Request ---
                                         const editRequest = penilaian?.latest_edit_request || penilaian?.latestEditRequest;
                                         const isEditMode = editRequest && editRequest.status === 'approved';
-                                        // --------------------------------------------
 
                                         return (
                                         <tr key={p.id} className={`hover:bg-gray-50 ${highlightedId == p.id ? 'bg-blue-50 ring-2 ring-inset ring-blue-200' : ''}`}>
                                             <td className="py-3 px-4">
                                                 <div>{p.pemegang?.nama_pelaku_usaha || '-'}</div>
-                                                {/* Indikator Mode Edit */}
                                                 {isEditMode && (
                                                     <div className="mt-1">
                                                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200 animate-pulse">
-                                                            <svg className="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                                                             Izin Edit Aktif
                                                         </span>
                                                     </div>
@@ -258,7 +244,7 @@ export default function PenilaianPage() {
                                             <td className="py-3 px-4"><StatusPenilaianBadge permohonan={p} /></td>
                                             <td className="py-3 px-4">
                                                 <div className="flex flex-wrap gap-2">
-                                                    {/* Tombol Utama (Nilai/Detail) */}
+                                                    {/* Tombol Utama */}
                                                     {!tidakTerlaksana && (
                                                         <button 
                                                             onClick={() => handleNilai(p)} 
@@ -283,7 +269,10 @@ export default function PenilaianPage() {
                                                     {/* Formulir Analisis */}
                                                     {showAnalisisButton && (
                                                         <button
-                                                            onClick={() => navigate(`/penilaian/${p.kasus.penilaian.id}/formulir-analisis`)}
+                                                            // PERBAIKAN FATAL DI SINI:
+                                                            // Sebelumnya: navigate(`/penilaian/${p.kasus.penilaian.id}/formulir-analisis`)
+                                                            // Sekarang: Gunakan Kasus ID karena halaman Formulir mengharapkan Kasus ID
+                                                            onClick={() => navigate(`/penilaian/${p.kasus.id}/formulir-analisis`)}
                                                             className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded-md text-sm relative"
                                                         >
                                                             Analisis
@@ -294,6 +283,8 @@ export default function PenilaianPage() {
                                                     {/* Berita Acara Hasil Penilaian */}
                                                     {showBaHasilButton && (
                                                         <button
+                                                            // Note: Halaman BA Hasil sepertinya menggunakan Penilaian ID di controllernya,
+                                                            // jadi ini kemungkinan benar, tapi cek jika perlu diganti kasus ID juga.
                                                             onClick={() => navigate(`/penilaian/${p.kasus.penilaian.id}/ba-hasil`)}
                                                             className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
                                                             title="Berita Acara Hasil Penilaian Akhir"
@@ -302,7 +293,6 @@ export default function PenilaianPage() {
                                                         </button>
                                                     )}
                                                     
-                                                    {/* Tombol Edit & Hapus (Hanya Admin & Ketua Tim) */}
                                                     {!tidakTerlaksana && canEditDelete && (
                                                         <button onClick={() => handleEdit(p.id)} className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Edit</button>
                                                     )}
@@ -310,6 +300,20 @@ export default function PenilaianPage() {
                                                         <button onClick={() => handleDelete(p.id)} className="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md text-sm">Hapus</button>
                                                     )}
                                                 </div>
+
+                                                {/* --- DEBUGGING VISUAL --- */}
+                                                {penilaian && (
+                                                    <div className="mt-2 text-[10px] text-gray-500 bg-gray-100 p-2 rounded border border-gray-200 font-mono overflow-hidden">
+                                                        <div className="font-bold mb-1 text-red-600">DEBUG MODE</div>
+                                                        <div className="grid grid-cols-2 gap-x-2">
+                                                            <span>• Has Formulir Flag:</span>
+                                                            <span className={hasFlag ? "text-green-600 font-bold" : "text-red-600"}>{hasFlag ? "TRUE" : "FALSE"}</span>
+                                                            <span className="col-span-2 border-t mt-1 pt-1 font-semibold text-blue-600">
+                                                                Result: {showBaHasilButton ? "SHOW BUTTON" : "HIDE BUTTON"}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                         )
