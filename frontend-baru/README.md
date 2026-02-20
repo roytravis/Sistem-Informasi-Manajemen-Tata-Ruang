@@ -1,13 +1,13 @@
-# SIMANTRA Frontend — Sistem Manajemen Penilaian
+# SIMANTRA Frontend — Spatial Planning Management Information System
 
-Frontend untuk **SIMANTRA** (Sistem Manajemen Penilaian), antarmuka pengguna untuk mengelola proses penilaian dan pemeriksaan lapangan. Dibangun dengan **React 19** dan **Vite 7**, menggunakan **TailwindCSS** untuk styling.
+Frontend for **SIMANTRA** (Sistem Informasi Manajemen Tata Ruang), a user interface for managing assessment and field inspection processes. Built with **React 19** and **Vite 7**, styled with **TailwindCSS**.
 
 ---
 
 ## 🚀 Tech Stack
 
-| Teknologi | Versi |
-|-----------|-------|
+| Technology | Version |
+|------------|---------|
 | React | ^19.1.1 |
 | Vite | ^7.1.6 |
 | TailwindCSS | ^3.4.17 |
@@ -19,51 +19,51 @@ Frontend untuk **SIMANTRA** (Sistem Manajemen Penilaian), antarmuka pengguna unt
 
 ---
 
-## 📋 Fitur Utama
+## 📋 Key Features
 
-- **Autentikasi** — Halaman login dengan token-based authentication
-- **Dashboard Penilaian** — Daftar dan filter permohonan penilaian dengan tabs status
-- **CRUD Penilaian** — Tambah, edit, dan detail penilaian lengkap
-- **Manajemen Pemegang Usaha** — Kelola data pelaku usaha
-- **Manajemen Tim Penilai** — Kelola tim dan anggota
-- **Berita Acara** — Buat dan preview Berita Acara kegiatan
-- **BA Pemeriksaan** — Formulir Berita Acara Pemeriksaan Lapangan
-- **Formulir Analisis Penilaian** — Form analisis dengan tanda tangan digital multi-role
-- **BA Hasil Penilaian** — Input dan preview Berita Acara Hasil Penilaian
-- **Tanda Tangan Digital** — Capture tanda tangan langsung di browser
-- **Sistem Persetujuan Edit** — Request dan approve/reject perubahan data
-- **Protected Routes** — Halaman terproteksi berdasarkan status autentikasi
+- **Authentication** — Login page with token-based authentication
+- **Assessment Dashboard** — List and filter assessment requests with status tabs
+- **Assessment CRUD** — Create, edit, and view assessment details
+- **Business Entity Management** — Manage assessed business entities
+- **Assessment Team Management** — Manage teams and members
+- **Official Reports (Berita Acara)** — Create and preview official activity reports
+- **Inspection Reports (BA Pemeriksaan)** — Field inspection report forms
+- **Assessment Analysis Form** — Comprehensive analysis form with multi-role digital signatures
+- **Assessment Results Report (BA Hasil)** — Input and preview final assessment results
+- **Digital Signatures** — Capture signatures directly in the browser
+- **Edit Approval System** — Request and approve/reject data changes
+- **Protected Routes** — Authentication-based route guarding
 
 ---
 
-## 📁 Struktur Proyek
+## 📁 Project Structure
 
 ```
 frontend-baru/
 ├── public/
 ├── src/
 │   ├── api/
-│   │   └── axios.js              # Konfigurasi Axios & interceptors
+│   │   └── axios.js              # Axios configuration & interceptors
 │   ├── assets/
 │   ├── components/
-│   │   ├── Layout.jsx            # Layout utama aplikasi
-│   │   └── ProtectedRoute.jsx    # Route guard autentikasi
+│   │   ├── Layout.jsx            # Main application layout
+│   │   └── ProtectedRoute.jsx    # Authentication route guard
 │   ├── context/                  # React Context providers
 │   ├── pages/
-│   │   ├── LoginPage.jsx                    # Halaman login
-│   │   ├── PemegangPage.jsx                 # Manajemen pemegang usaha
-│   │   ├── TimPenilaiPage.jsx               # Manajemen tim penilai
-│   │   ├── PenilaianPage.jsx                # Daftar penilaian
-│   │   ├── PenilaianDetailPage.jsx          # Detail penilaian
-│   │   ├── AddPenilaianPage.jsx             # Tambah penilaian
-│   │   ├── EditPenilaianPage.jsx            # Edit penilaian
-│   │   ├── EditApprovalPage.jsx             # Persetujuan edit
-│   │   ├── AddBeritaAcaraPage.jsx           # Tambah berita acara
-│   │   ├── BeritaAcaraPreviewPage.jsx       # Preview berita acara
-│   │   ├── BeritaAcaraPemeriksaanPage.jsx   # BA pemeriksaan lapangan
-│   │   ├── FormulirAnalisisPage.jsx         # Formulir analisis penilaian
-│   │   ├── BaHasilPenilaianInputPage.jsx    # Input BA hasil penilaian
-│   │   └── BaHasilPenilaianPreviewPage.jsx  # Preview BA hasil penilaian
+│   │   ├── LoginPage.jsx                    # Login page
+│   │   ├── PemegangPage.jsx                 # Business entity management
+│   │   ├── TimPenilaiPage.jsx               # Assessment team management
+│   │   ├── PenilaianPage.jsx                # Assessment list
+│   │   ├── PenilaianDetailPage.jsx          # Assessment details
+│   │   ├── AddPenilaianPage.jsx             # Create new assessment
+│   │   ├── EditPenilaianPage.jsx            # Edit assessment
+│   │   ├── EditApprovalPage.jsx             # Edit approval workflow
+│   │   ├── AddBeritaAcaraPage.jsx           # Create official report
+│   │   ├── BeritaAcaraPreviewPage.jsx       # Preview official report
+│   │   ├── BeritaAcaraPemeriksaanPage.jsx   # Field inspection report
+│   │   ├── FormulirAnalisisPage.jsx         # Assessment analysis form
+│   │   ├── BaHasilPenilaianInputPage.jsx    # Assessment results input
+│   │   └── BaHasilPenilaianPreviewPage.jsx  # Assessment results preview
 │   ├── App.jsx                   # Router & route definitions
 │   ├── App.css
 │   ├── main.jsx                  # Entry point
@@ -76,17 +76,17 @@ frontend-baru/
 
 ---
 
-## ⚙️ Instalasi & Setup
+## ⚙️ Installation & Setup
 
-### Prasyarat
+### Prerequisites
 
-- Node.js >= 20.19 atau >= 22.12
+- Node.js >= 20.19 or >= 22.12
 - npm 9+
-- Backend API sudah berjalan di `http://127.0.0.1:8000`
+- Backend API running at `http://127.0.0.1:8000`
 
-### Langkah Instalasi
+### Installation Steps
 
-1. **Clone repository**
+1. **Clone the repository**
    ```bash
    git clone <repository-url>
    cd frontend-baru
@@ -97,29 +97,29 @@ frontend-baru/
    npm install
    ```
 
-3. **Jalankan development server**
+3. **Start the development server**
    ```bash
    npm run dev
    ```
-   Akses aplikasi di `http://localhost:5173`
+   Access the application at `http://localhost:5173`
 
-4. **Build untuk production**
+4. **Build for production**
    ```bash
    npm run build
    ```
 
-5. **Preview production build**
+5. **Preview the production build**
    ```bash
    npm run preview
    ```
 
 ---
 
-## 🔧 Konfigurasi
+## 🔧 Configuration
 
 ### API Base URL
 
-Konfigurasi koneksi ke backend API terdapat di `src/api/axios.js`:
+The backend API connection is configured in `src/api/axios.js`:
 
 ```javascript
 const api = axios.create({
@@ -127,50 +127,50 @@ const api = axios.create({
 });
 ```
 
-Ubah `baseURL` sesuai alamat backend API di environment yang digunakan.
+Update `baseURL` to match your backend API address for the target environment.
 
 ---
 
-## 📱 Halaman Aplikasi
+## 📱 Application Pages
 
-| Route | Halaman | Deskripsi |
-|-------|---------|-----------|
-| `/login` | Login | Autentikasi pengguna |
-| `/penilaian` | Daftar Penilaian | Dashboard utama penilaian |
-| `/penilaian/tambah` | Tambah Penilaian | Form permohonan baru |
-| `/penilaian/:id` | Detail Penilaian | Detail lengkap penilaian |
-| `/penilaian/:id/edit` | Edit Penilaian | Ubah data penilaian |
-| `/penilaian/persetujuan-edit` | Persetujuan Edit | Approve/reject permintaan edit |
-| `/pemegangs` | Pemegang Usaha | Kelola data pelaku usaha |
-| `/tims` | Tim Penilai | Kelola tim dan anggota |
-| `/penilaian/:id/berita-acara-pemeriksaan` | BA Pemeriksaan | Berita acara pemeriksaan lapangan |
-| `/penilaian/:id/formulir-analisis` | Formulir Analisis | Form analisis penilaian |
-| `/penilaian/:id/ba-hasil/input` | Input BA Hasil | Input berita acara hasil |
-| `/penilaian/:id/ba-hasil/preview` | Preview BA Hasil | Preview berita acara hasil |
-
----
-
-## 🛠️ Scripts
-
-| Script | Perintah | Deskripsi |
-|--------|----------|-----------|
-| Dev | `npm run dev` | Menjalankan development server |
-| Build | `npm run build` | Build production bundle |
-| Preview | `npm run preview` | Preview production build |
-| Lint | `npm run lint` | Jalankan ESLint |
+| Route | Page | Description |
+|-------|------|-------------|
+| `/login` | Login | User authentication |
+| `/penilaian` | Assessment List | Main assessment dashboard |
+| `/penilaian/tambah` | New Assessment | Create a new assessment request |
+| `/penilaian/:id` | Assessment Details | Full assessment details view |
+| `/penilaian/:id/edit` | Edit Assessment | Modify assessment data |
+| `/penilaian/persetujuan-edit` | Edit Approval | Approve or reject edit requests |
+| `/pemegangs` | Business Entities | Manage business entity records |
+| `/tims` | Assessment Teams | Manage teams and members |
+| `/penilaian/:id/berita-acara-pemeriksaan` | Inspection Report | Field inspection report form |
+| `/penilaian/:id/formulir-analisis` | Analysis Form | Assessment analysis form |
+| `/penilaian/:id/ba-hasil/input` | Results Input | Input assessment results |
+| `/penilaian/:id/ba-hasil/preview` | Results Preview | Preview assessment results |
 
 ---
 
-## 🔗 Koneksi Backend
+## 🛠️ Available Scripts
 
-Frontend ini dirancang untuk berjalan bersama **SIMANTRA Backend** (Laravel). Pastikan:
-
-1. Backend sudah berjalan di `http://127.0.0.1:8000`
-2. Database `simantra_db` sudah di-migrate
-3. CORS sudah dikonfigurasi di backend
+| Script | Command | Description |
+|--------|---------|-------------|
+| Dev | `npm run dev` | Start the development server |
+| Build | `npm run build` | Build the production bundle |
+| Preview | `npm run preview` | Preview the production build |
+| Lint | `npm run lint` | Run ESLint code analysis |
 
 ---
 
-## 📄 Lisensi
+## 🔗 Backend Connection
+
+This frontend is designed to work with the **SIMANTRA Backend** (Laravel). Before running, make sure:
+
+1. The backend server is running at `http://127.0.0.1:8000`
+2. The `simantra_db` database has been migrated
+3. CORS is properly configured on the backend
+
+---
+
+## 📄 License
 
 MIT License
