@@ -155,25 +155,54 @@ class FormulirAnalisisPenilaianController extends Controller
             }
             // -----------------------------------------------------------------------
 
-            // --- DYNAMIC STATUS UPDATE: Stage 3 Completed ---
-            // After FORMULIR ANALISIS PENILAIAN is saved, update status to next stage
+            // --- DYNAMIC STATUS UPDATE: Stage 3 ---
+            // Only advance status to next stage if ALL team signatures are complete
             $penilaianWithKasus = Penilaian::with('kasus')->find($penilaian->id);
             
             if ($penilaianWithKasus && $penilaianWithKasus->kasus) {
                 $kasus = $penilaianWithKasus->kasus;
-                $kasus->update(['status' => 'Menunggu Berita Acara Hasil Penilaian']);
                 
+                // Collect all required team member IDs
                 $permohonan = \App\Models\PermohonanPenilaian::where('nomor_permohonan', $kasus->nomor_permohonan)->first();
+                $requiredUserIds = collect();
+                
                 if ($permohonan) {
-                    $permohonan->update(['status' => 'Menunggu Berita Acara Hasil Penilaian']);
+                    // Add tim.users (Ketua Tim, Petugas Lapangan, etc.)
+                    $permohonan->load('tim.users');
+                    if ($permohonan->tim && $permohonan->tim->users) {
+                        $requiredUserIds = $requiredUserIds->merge($permohonan->tim->users->pluck('id'));
+                    }
                 }
                 
-                Log::info("Status updated to 'Menunggu Berita Acara Hasil Penilaian' for Kasus ID {$kasus->id} after Stage 3 completed.");
+                // Koordinator Lapangan is already included in tim.users with jabatan_di_tim = 'Koordinator Lapangan'
+                // No need to separately add penanggung_jawab
                 
-                // --- SEND STAGE COMPLETION NOTIFICATIONS ---
-                // Notify Koordinator Lapangan and Ketua Tim about Stage 3 completion
-                $this->sendStageCompletionNotifications($kasus, 3, $request->user());
-                // --- END NOTIFICATIONS ---
+                $requiredUserIds = $requiredUserIds->unique();
+                
+                // Check if all required members have signed
+                $savedSignatures = $formulir->tanda_tangan_tim ?? [];
+                $signedUserIds = collect($savedSignatures)->pluck('user_id')->map(fn($id) => (int) $id);
+                $requiredUserIds = $requiredUserIds->map(fn($id) => (int) $id)->unique();
+                $allSigned = $requiredUserIds->isNotEmpty() && $requiredUserIds->every(fn($id) => $signedUserIds->contains($id));
+                
+                if ($allSigned) {
+                    // All signatures complete → advance to next stage
+                    $newStatus = 'Menunggu Berita Acara Hasil Penilaian';
+                    Log::info("Status updated to '{$newStatus}' for Kasus ID {$kasus->id} after Stage 3 completed (all signatures present).");
+                    
+                    // --- SEND STAGE COMPLETION NOTIFICATIONS ---
+                    $this->sendStageCompletionNotifications($kasus, 3, $request->user());
+                    // --- END NOTIFICATIONS ---
+                } else {
+                    // Partial save → formulir analysis still in progress
+                    $newStatus = 'Proses Formulir Analisis';
+                    Log::info("Status updated to '{$newStatus}' for Kasus ID {$kasus->id} (signatures incomplete: {$signedUserIds->count()}/{$requiredUserIds->count()}).");
+                }
+                
+                $kasus->update(['status' => $newStatus]);
+                if ($permohonan) {
+                    $permohonan->update(['status' => $newStatus]);
+                }
             }
             // --- END DYNAMIC STATUS UPDATE ---
 

@@ -16,13 +16,18 @@ class CheckRole
      */
     public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // PERBAIKAN: Melakukan trim pada role pengguna untuk menghilangkan spasi
-        // yang mungkin tidak sengaja tersimpan di database.
+        // Trim role to handle any whitespace in database
         $userRole = Auth::user() ? trim(Auth::user()->role) : null;
 
         if (!Auth::check() || !in_array($userRole, $roles)) {
-            // Jika pengguna tidak login atau perannya tidak sesuai, kembalikan error
-            return response()->json(['message' => 'Akses ditolak: Anda tidak memiliki izin.'], 403);
+            // API requests get JSON response
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => 'Akses ditolak: Anda tidak memiliki izin.'], 403);
+            }
+
+            // Web requests get redirected with flash message
+            return redirect()->route('penilaian')
+                ->with('error', 'Akses ditolak: Anda tidak memiliki izin untuk halaman tersebut.');
         }
         return $next($request);
     }

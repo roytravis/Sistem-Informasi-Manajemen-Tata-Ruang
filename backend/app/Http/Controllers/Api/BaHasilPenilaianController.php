@@ -126,9 +126,10 @@ class BaHasilPenilaianController extends Controller
                     if ($ketua) $requiredSignersCount++;
                 }
                 
-                // Koordinator Lapangan
-                if ($kasus->penanggung_jawab) {
-                    $requiredSignersCount++;
+                // Koordinator Lapangan (from tim.users)
+                if ($kasus->permohonan && $kasus->permohonan->tim) {
+                    $koordinator = $kasus->permohonan->tim->users->firstWhere('pivot.jabatan_di_tim', 'Koordinator Lapangan');
+                    if ($koordinator) $requiredSignersCount++;
                 }
                 
                 // Check if all required signatures are present
