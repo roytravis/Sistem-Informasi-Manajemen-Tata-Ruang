@@ -38,6 +38,18 @@ Built as a **single Laravel application** using **Livewire 3** for interactive f
 
 ---
 
+## 📸 Screenshots
+
+| Dashboard | Business Entities (Pemegang) |
+|---|---|
+| ![Dashboard](screenshots/dashboard.png) | ![Pemegang](screenshots/pemegangs.png) |
+
+| Assessment Teams (Tim Penilai) |
+|---|
+| ![Tims](screenshots/tims.png) |
+
+---
+
 ## 👥 User Roles
 
 | Role | Description |
